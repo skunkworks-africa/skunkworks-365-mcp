@@ -14,7 +14,7 @@ https://github.com/skunkworks-africa/www
 | `assets/skunkworks-global-footer.js` | [skunkworks-africa/www/assets/skunkworks-global-footer.js](https://github.com/skunkworks-africa/www/blob/main/assets/skunkworks-global-footer.js) | `449ea8a5dec72fb2bee3b028cf7938f586f3b999` |
 | `site.js` | [skunkworks-africa/www/site.js](https://github.com/skunkworks-africa/www/blob/main/site.js) | `a887776fb6e44a3851d8889104be568878d94621` |
 
-Local copies intentionally retain the original classes and values. The MCP-specific stylesheet `mcp.css` adds layout for code samples, tables and other project content without redefining global brand colors.
+Stylesheets and theme initialization retain the original classes and values. The copied `site.js` is narrowed to mobile navigation behavior, and global footer JS adds best-effort browser storage handling for the theme picker. The source SHAs above identify upstream origins, not byte-identical hashes for the two adapted scripts. The MCP-specific stylesheet `mcp.css` adds layout for code samples, tables and other project content without redefining global brand colors.
 
 The corporate logo and favicon are referenced from the canonical corporate host rather than introducing a second product mark. Header primary navigation follows **Solutions → Services → Academy → Skunkworks** with the Store in a separate Shop action. The standard global footer, theme picker and `skunkworks-theme` persistence are copied from corporate source.
 
@@ -32,7 +32,7 @@ The corporate logo and favicon are referenced from the canonical corporate host 
 
 When `skunkworks-africa/www` updates a canonical style or footer:
 1. Compare the listed upstream blobs with the new main branch.
-2. Copy the changed source file verbatim into both root and `docs/`.
+2. Copy shared styles verbatim into both root and `docs/`; preserve the documented MCP-specific adaptations for `site.js` and the footer script.
 3. Review whether the brand component requires corresponding HTML markup changes.
 4. Re-run `npm test` and conduct a light/dark/mobile/keyboard smoke test.
 5. Review the source and merge through a pull request.
