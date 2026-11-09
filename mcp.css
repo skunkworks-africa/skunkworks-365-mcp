@@ -1,0 +1,48 @@
+/* MCP-specific extension. Canonical design tokens and global shell are pinned snapshots of skunkworks-africa/www. */
+.mcp-hero-meta{margin-top:20px;color:var(--muted);font-size:.83rem;font-weight:670}
+.mcp-hero-meta span{margin-inline:7px}
+.mcp-status{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.8fr);align-items:center;gap:42px;padding:28px;border:1px solid var(--line);border-left:4px solid var(--fg);border-radius:var(--radius-sm)}
+.mcp-status .eyebrow{margin-bottom:10px}
+.mcp-status-title{font-size:clamp(1.45rem,2.7vw,2.4rem);line-height:1.12;margin:0}
+.mcp-status>p{margin:0;color:var(--muted);font-size:.98rem}
+.mcp-steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:44px}
+.mcp-step{min-width:0;border:1px solid var(--line);border-radius:var(--radius);padding:26px;background:var(--bg)}
+.mcp-step h3{font-size:clamp(1.3rem,2vw,1.8rem)}
+.mcp-step p:not(.eyebrow){font-size:.96rem;color:var(--muted);min-height:4.7em}
+.mcp-code{position:relative;min-width:0;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--soft);margin-top:20px}
+.mcp-code pre{margin:0;overflow:auto;padding:48px 15px 17px;font:12.5px/1.8 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;white-space:pre;max-width:100%}
+.mcp-code button{position:absolute;right:9px;top:9px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:8px;padding:5px 12px;font-weight:750;cursor:pointer;font-size:12px}
+.mcp-code button:hover{background:var(--soft)}
+.mcp-code button:focus-visible{outline:3px solid var(--fg);outline-offset:3px}
+.mcp-advisory{padding:18px 20px;border-left:3px solid var(--fg);background:var(--soft);color:var(--muted);border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin:30px 0 0}
+.mcp-advisory a,.mcp-text-link{font-weight:780;text-decoration:underline;text-underline-offset:3px}
+.mcp-ordered{padding-left:24px;margin-top:0;color:var(--muted)}
+.mcp-ordered li{margin-bottom:18px}
+.mcp-ordered strong{color:var(--fg)}
+.mcp-inline-panel{border:1px solid var(--line);border-radius:var(--radius-sm);padding:22px;overflow-wrap:anywhere}
+.mcp-inline-panel code{font-size:13px}
+.mcp-inline-panel p:last-child{color:var(--muted);font-size:.9rem;margin-bottom:0}
+.mcp-table-wrap{overflow:auto;margin-top:38px;border:1px solid var(--line);border-radius:var(--radius-sm)}
+.mcp-table{width:100%;border-collapse:collapse;min-width:650px}
+.mcp-table th,.mcp-table td{padding:16px 20px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.mcp-table tr:last-child td{border-bottom:0}
+.mcp-table th{font-size:.74rem;text-transform:uppercase;letter-spacing:.1em}
+.mcp-table td{color:var(--muted);font-size:.91rem}
+.mcp-table td:first-child,.mcp-table td:last-child{color:var(--fg);font-weight:750}
+.mcp-table code{font:12px ui-monospace,SFMono-Regular,Consolas,monospace}
+.mcp-doc-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin-top:40px}
+.mcp-doc-links a{display:grid;gap:5px;padding:24px;text-decoration:none;min-width:0;border-bottom:1px solid var(--line)}
+.mcp-doc-links a:nth-child(odd){border-right:1px solid var(--line)}
+.mcp-doc-links a:nth-last-child(-n+2){border-bottom:0}
+.mcp-doc-links a:hover{background:var(--soft)}
+.mcp-doc-links span{font-size:.84rem;color:var(--muted)}
+.mcp-doc-links strong{font-size:1.1rem}
+.hero-panel a{overflow-wrap:anywhere}
+@media(max-width:900px){.mcp-status{grid-template-columns:1fr;gap:14px}.mcp-status>p{max-width:70ch}}
+@media(max-width:700px){.mcp-steps,.mcp-doc-links{grid-template-columns:1fr}.mcp-step p:not(.eyebrow){min-height:0}.mcp-doc-links a:nth-child(odd){border-right:0}.mcp-doc-links a:nth-last-child(2){border-bottom:1px solid var(--line)}.mcp-table th,.mcp-table td{padding:12px 14px}}
+@media(prefers-reduced-motion:reduce){.mcp-code button{transition:none}}
+
+/* Short mobile/landscape viewport navigation. */
+@media(max-width:820px){.mobile-menu{max-height:calc(100vh - var(--header));max-height:calc(100dvh - var(--header));overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}}
+/* Visible keyboard focus in monochrome inverted sections. */
+.section-band :focus-visible,.cta :focus-visible{outline:3px solid var(--bg);outline-offset:3px}
