@@ -1,0 +1,12 @@
+[
+  {
+    "issuer": "https://identity.example.invalid/",
+    "subject": "REPLACE_WITH_VERIFIED_TOKEN_SUBJECT",
+    "tenants": [
+      {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "name": "Example tenant — no Microsoft connection"
+      }
+    ]
+  }
+]
