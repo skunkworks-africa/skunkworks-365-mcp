@@ -5,10 +5,12 @@
   "description": "Local read-only Microsoft 365/CSP MCP prototype; upstream connectors unavailable",
   "license": "MIT",
   "type": "module",
-  "engines": {"node": ">=24"},
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test dist/test/*.test.js",
+    "test": "npm run build && node --test dist/test/*.test.js && node --test test/theme-conformance.test.mjs",
     "start": "node dist/src/main.js"
   },
   "dependencies": {
