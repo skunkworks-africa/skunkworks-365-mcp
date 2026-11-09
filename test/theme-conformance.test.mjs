@@ -31,3 +31,20 @@ test('functional developer content and download links remain',()=>{
   for(const name of ['quickstart','chatgpt','downloads','status','security']) assert.ok(page.includes('id="'+name+'"'),name);
   for(const text of ['npm run build','connector_unavailable','not a remote MCP endpoint','/archive/refs/heads/main.zip']) assert.ok(page.includes(text),text);
 });
+
+test('mobile navigation remains reachable on short screens',()=>{
+  assert.match(read('mcp.css'),/max-height:calc\(100dvh - var\(--header\)\)/);
+  assert.ok(read('mcp.css').includes('overflow-y:auto'));
+});
+test('inverted sections have contrasting keyboard focus',()=>{
+  assert.ok(read('mcp.css').includes('.section-band :focus-visible,.cta :focus-visible{outline:3px solid var(--bg)'));
+});
+test('theme picker applies preferences when storage is disabled',()=>{
+  const footer=read('assets/skunkworks-global-footer.js');
+  assert.ok(footer.includes('try{localStorage.setItem('));
+  assert.ok(footer.includes("catch(_){}try{if(location.hostname"));
+});
+test('page script does not duplicate corporate assistant routing',()=>{
+  assert.ok(read('site.js').includes('data-menu-button'));
+  assert.ok(!read('site.js').includes('routeAssistantQuery'));
+});
