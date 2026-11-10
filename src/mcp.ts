@@ -2,7 +2,7 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import {
   authorizedTenants, readTenant, tenantIdSchema, TenantAccessDenied,
-  type Principal, type Grants, type Adapter, type Operation
+  type Principal, type Grants, type Adapter, type Operation, type ReadOptions
 } from './domain.js';
 
 export function makeServer(principal: Principal, grants: Grants, adapter: Adapter, requiredScope?: string) {
@@ -15,7 +15,7 @@ export function makeServer(principal: Principal, grants: Grants, adapter: Adapte
   } : {};
   const annotations = {
     readOnlyHint: true, destructiveHint: false,
-    idempotentHint: true, openWorldHint: false
+    idempotentHint: true, openWorldHint: true
   };
   server.registerTool('tenants_list_authorized', {
     description: "List tenant IDs from this identity's local access registry. Not Microsoft customer discovery.",
@@ -28,7 +28,7 @@ export function makeServer(principal: Principal, grants: Grants, adapter: Adapte
 
   const operations: Operation[] = [
     'users.list', 'licenses.capacity', 'subscriptions.list',
-    'billing.records', 'gdap.relationships', 'policies.list', 'applications.list'
+    'billing.records', 'gdap.relationships', 'policies.list', 'applications.list', 'service.health', 'users.get'
   ];
   for (const operation of operations) {
     server.registerTool(operation.replace('.', '_'), {

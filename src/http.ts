@@ -1,6 +1,7 @@
 import { createMcpHandler } from '@modelcontextprotocol/server';
+import { createHash, randomUUID } from 'node:crypto';
 import { authenticate, type VerifyToken } from './auth.js';
-import type { Grants, Adapter } from './domain.js';
+import { authorizedTenants, type Grants, type Adapter } from './domain.js';
 import { makeServer } from './mcp.js';
 import { authenticationChallenge, protectedResourceMetadata, type RemoteConfig } from './remote.js';
 
