@@ -1,0 +1,38 @@
+name: Entra bootstrap validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-script:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse PowerShell script without executing it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path './scripts/register-entra-api.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+          Write-Host 'PowerShell parser: success'
+      - name: Run safe read-only default
+        shell: pwsh
+        run: |
+          $result = & './scripts/register-entra-api.ps1' -TenantId '00000000-0000-4000-8000-000000000001' 6>&1 | Out-String
+          if ($LASTEXITCODE -ne 0 -and $null -ne $LASTEXITCODE) { exit 1 }
+          if (-not $result.Contains('No changes made')) {
+            throw 'Bootstrap must default to no changes'
+          }
