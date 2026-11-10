@@ -72,6 +72,6 @@ async function main() {
       try { await client.logoutPopup({ account, postLogoutRedirectUri: settings.redirectUri }); }
       finally { account = undefined; $('workspace').hidden = true; $('signout').hidden = true; $('entry').hidden = false; notice('Signed out.'); }
     });
-  } catch { notice('Dashboard setup could not load.', true); }
+  } catch (error) { console.error('Dashboard setup failed', error); notice('Dashboard setup could not load.', true); }
 }
 main();
