@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: 'Approved public image pinned to sha256 digest'
+        description: 'Approved image pinned to sha256 digest'
         required: true
         type: string
 permissions:
@@ -23,6 +23,9 @@ jobs:
       API_CLIENT: ${{ secrets.MCP_API_CLIENT_ID }}
       GRAPH_CLIENT: ${{ secrets.GRAPH_CLIENT_ID }}
       ACCESS_REGISTRY: ${{ secrets.MCP_ACCESS_REGISTRY_JSON }}
+      REGISTRY: ${{ secrets.CONTAINER_REGISTRY_SERVER }}
+      REGISTRY_USER: ${{ secrets.CONTAINER_PULL_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.CONTAINER_PULL_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -46,7 +49,9 @@ jobs:
             if (!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(e[key] ?? '')) throw new Error('Invalid identity configuration');
           }
           grantsSchema.parse(JSON.parse(e.ACCESS_REGISTRY));
-          const values = { containerImage: e.IMAGE, homeTenantId: e.HOME_TENANT, apiClientId: e.API_CLIENT, graphClientId: e.GRAPH_CLIENT, accessRegistryJson: e.ACCESS_REGISTRY };
+          if (e.REGISTRY && !e.IMAGE.startsWith(e.REGISTRY + '/skunkworks-365-mcp@sha256:')) throw new Error('Image must use the approved repository');
+          const values = { containerImage: e.IMAGE, homeTenantId: e.HOME_TENANT, apiClientId: e.API_CLIENT, graphClientId: e.GRAPH_CLIENT, accessRegistryJson: e.ACCESS_REGISTRY,
+            registryServer: e.REGISTRY ?? '', registryUsername: e.REGISTRY_USER ?? '', registryPassword: e.REGISTRY_PASSWORD ?? '' };
           writeFileSync('runtime.parameters.json', JSON.stringify({ parameters: Object.fromEntries(Object.entries(values).map(([k,v]) => [k,{value:v}])) }), { mode: 0o600 });
           NODE
       - name: Deploy
