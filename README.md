@@ -7,7 +7,7 @@
 
 An independent, publicly developed Model Context Protocol (MCP) project for secure **Microsoft 365, CSP customer and licensing administration** through ChatGPT and compatible clients.
 
-> **Current status (v0.3.0 preview):** Entra-protected remote resource-server code with an optional read-only Microsoft Graph connector and Azure deployment templates. A source checkout does not provision a hosted service. The website is static documentation, not an MCP server.
+> **Current status:** The protected MCP service is running in Azure with read-only Microsoft Graph service-health and licence-capacity reads for approved tenants. The [private staff dashboard](https://skunkworks-365-mcp.greengrass-4f5c56b8.southafricanorth.azurecontainerapps.io/dashboard/) has been verified with a signed-in approved account. The [public status page](https://skunkworks-365-mcp.greengrass-4f5c56b8.southafricanorth.azurecontainerapps.io/status) shows service availability only. A source checkout alone does not provision a hosted service.
 
 ## Download
 
