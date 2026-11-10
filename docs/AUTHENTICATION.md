@@ -18,6 +18,22 @@ Install-Module Microsoft.Graph.Authentication,Microsoft.Graph.Applications -Scop
 
 The execution step opens an interactive Entra sign-in and requests delegated `Application.ReadWrite.All`, a **high-privilege** Microsoft Graph permission. An eligible Entra administrator must review/consent; never run this with unattended credentials, on an untrusted machine, or from public CI. The script refuses to create an app if its display name already exists and requires an interactive high-impact PowerShell confirmation. Save the returned IDs **privately** for your runtime's secret store. Do not paste access tokens or client secrets into chat or public GitHub issues.
 
+## Optional admin-reviewed bootstrap script
+
+The repository includes [`scripts/register-entra-api.ps1`](../scripts/register-entra-api.ps1), a dry-run-by-default PowerShell bootstrap for the **initial single-tenant** MCP resource API. It does not register ChatGPT as an OAuth client, generate secrets, grant consent, or configure Graph customer access.
+
+With PowerShell 7.2+ and the Microsoft Graph modules installed on **your own administrator workstation**:
+
+```powershell
+Install-Module Microsoft.Graph.Authentication,Microsoft.Graph.Applications -Scope CurrentUser
+# Read-only plan (no Microsoft sign-in or mutation):
+./scripts/register-entra-api.ps1 -TenantId '<YOUR-ENTRA-TENANT-GUID>'
+# Only after reviewing the plan and granting tenant-admin authorization:
+./scripts/register-entra-api.ps1 -TenantId '<YOUR-ENTRA-TENANT-GUID>' -Execute
+```
+
+The execution step opens an interactive Entra sign-in and requests delegated `Application.ReadWrite.All`, a **high-privilege** Microsoft Graph permission. An eligible Entra administrator must review/consent; never run this with unattended credentials, on an untrusted machine, or from public CI. The script refuses to create an app if its display name already exists and requires an interactive high-impact PowerShell confirmation. Save the returned IDs **privately** for your runtime's secret store. Do not paste access tokens or client secrets into chat or public GitHub issues.
+
 ## Initial Microsoft Entra ID pilot: one authorized tenant
 
 1. In the Microsoft Entra admin center, create an application registration for a **Web API** in a test tenant you administer. Begin with *single-tenant*. In **Expose an API**, configure an Application ID URI and delegated `access_as_user` scope.
