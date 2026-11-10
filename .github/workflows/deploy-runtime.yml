@@ -22,6 +22,7 @@ jobs:
       HOME_TENANT: ${{ secrets.AZURE_TENANT_ID }}
       API_CLIENT: ${{ secrets.MCP_API_CLIENT_ID }}
       GRAPH_CLIENT: ${{ secrets.GRAPH_CLIENT_ID }}
+      DASHBOARD_CLIENT: ${{ vars.MCP_DASHBOARD_CLIENT_ID }}
       ACCESS_REGISTRY: ${{ secrets.MCP_ACCESS_REGISTRY_JSON }}
     steps:
       - uses: actions/checkout@v4
@@ -42,11 +43,11 @@ jobs:
           const e = process.env;
           if (!/^[a-zA-Z0-9./_-]+@sha256:[a-f0-9]{64}$/.test(e.IMAGE ?? '')) throw new Error('Use a digest-pinned image');
           if (!e.RESOURCE_GROUP) throw new Error('Resource group required');
-          for (const key of ['HOME_TENANT','API_CLIENT','GRAPH_CLIENT']) {
+          for (const key of ['HOME_TENANT','API_CLIENT','GRAPH_CLIENT','DASHBOARD_CLIENT']) {
             if (!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(e[key] ?? '')) throw new Error('Invalid identity configuration');
           }
           grantsSchema.parse(JSON.parse(e.ACCESS_REGISTRY));
-          const values = { containerImage: e.IMAGE, homeTenantId: e.HOME_TENANT, apiClientId: e.API_CLIENT, graphClientId: e.GRAPH_CLIENT, accessRegistryJson: e.ACCESS_REGISTRY };
+          const values = { containerImage: e.IMAGE, homeTenantId: e.HOME_TENANT, apiClientId: e.API_CLIENT, graphClientId: e.GRAPH_CLIENT, dashboardClientId: e.DASHBOARD_CLIENT, accessRegistryJson: e.ACCESS_REGISTRY };
           writeFileSync('runtime.parameters.json', JSON.stringify({ parameters: Object.fromEntries(Object.entries(values).map(([k,v]) => [k,{value:v}])) }), { mode: 0o600 });
           NODE
       - name: Deploy

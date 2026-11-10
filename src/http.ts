@@ -1,7 +1,7 @@
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import { createHash, randomUUID } from 'node:crypto';
 import { authenticate, type VerifyToken } from './auth.js';
-import { authorizedTenants, type Grants, type Adapter } from './domain.js';
+import { authorizedTenants, readTenant, tenantIdSchema, type Grants, type Adapter } from './domain.js';
 import { makeServer } from './mcp.js';
 import { authenticationChallenge, protectedResourceMetadata, type RemoteConfig } from './remote.js';
 
@@ -21,12 +21,14 @@ export function makeHttpApplication(verify: VerifyToken, grants: Grants, adapter
         headers: { 'Cache-Control': 'no-store' }
       });
     }
-    if (url.pathname !== '/mcp') return new Response('Not found', { status: 404 });
+    const dashboardTenants = url.pathname === '/dashboard/api/tenants';
+    const dashboardSummary = /^\/dashboard\/api\/tenant\/([^/]+)\/summary$/.exec(url.pathname);
+    if (url.pathname !== '/mcp' && !dashboardTenants && !dashboardSummary) return new Response('Not found', { status: 404 });
     const principal = await authenticate(request, verify);
     if (!principal) return new Response('Unauthorized', {
       status: 401, headers: { 'WWW-Authenticate': authenticationChallenge(remote), 'Cache-Control': 'no-store' }
     });
-    if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+    if (request.method !== (dashboardTenants || dashboardSummary ? 'GET' : 'POST')) return new Response('Method not allowed', { status: 405 });
     if (authorizedTenants(principal, grants).length === 0) return new Response('Forbidden', { status: 403 });
     const principalKey = createHash('sha256').update(principal.issuer + '\0' + (principal.objectId ?? principal.subject)).digest('hex');
     const now = Date.now();
@@ -37,6 +39,22 @@ export function makeHttpApplication(verify: VerifyToken, grants: Grants, adapter
       window = { count: 0, expires: now + 60_000 }; windows.set(principalKey, window);
     }
     if (++window.count > (options.rateLimit ?? 60)) return new Response('Too many requests', { status: 429, headers: { 'Retry-After': '60' } });
+    if (dashboardTenants || dashboardSummary) {
+      const headers = { 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8' };
+      if (dashboardTenants) return Response.json({ tenants: authorizedTenants(principal, grants) }, { headers });
+      const parsed = tenantIdSchema.safeParse(dashboardSummary![1]);
+      if (!parsed.success || !authorizedTenants(principal, grants).some(t => t.id.toLowerCase() === parsed.data.toLowerCase())) {
+        return new Response('Not found', { status: 404 });
+      }
+      const [health, licences] = await Promise.allSettled([
+        readTenant(principal, grants, parsed.data, 'service.health', adapter),
+        readTenant(principal, grants, parsed.data, 'licenses.capacity', adapter)
+      ]);
+      const safe = (result: PromiseSettledResult<unknown>) => result.status === 'fulfilled'
+        ? result.value : { status: 'unavailable', liveData: false };
+      options.audit?.({ time: new Date().toISOString(), principalHash: principalKey, method: 'dashboard.read', httpStatus: 200 });
+      return Response.json({ tenantId: parsed.data, health: safe(health), licences: safe(licences) }, { headers });
+    }
     const reader = request.body?.getReader();
     let size = 0;
     const chunks: Uint8Array[] = [];

@@ -1,5 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { toNodeHandler, localhostHostValidation, localhostOriginValidation } from '@modelcontextprotocol/node';
 import { authConfig, jwtVerifier } from './auth.js';
 import { grantsSchema, UnavailableAdapter } from './domain.js';
@@ -51,6 +52,34 @@ const server = createServer((req, res) => {
       res.writeHead(403); res.end('Forbidden origin'); return;
     }
   } else if (!localhostHost(req, res) || !localhostOrigin(req, res)) {
+    return;
+  }
+  const path = new URL(req.url ?? '/', 'http://localhost').pathname;
+  if (path === '/dashboard' || path === '/dashboard/' || path === '/status' || path === '/status/' || path === '/status.js' ||
+      ['/dashboard/app.js', '/dashboard/auth.js', '/dashboard/auth.html', '/dashboard/style.css', '/dashboard/config.json'].includes(path)) {
+    if (req.method !== 'GET') { res.writeHead(405); res.end('Method not allowed'); return; }
+    const common = {
+      'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https://login.microsoftonline.com; frame-src https://login.microsoftonline.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    };
+    if (path === '/dashboard/config.json') {
+      const clientId = process.env.MCP_DASHBOARD_CLIENT_ID;
+      res.writeHead(200, { ...common, 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ enabled: Boolean(remote && clientId),
+        ...(remote && clientId ? { clientId, tenantId: config.entraTenantId,
+          scope: remote.advertisedScope ?? remote.scope,
+          redirectUri: `${publicOrigin!.origin}/dashboard/auth.html` } : {}) })); return;
+    }
+    const file = path === '/dashboard' || path === '/dashboard/' ? 'index.html' :
+      path === '/status' || path === '/status/' ? 'status.html' :
+      path === '/status.js' ? 'status.js' : path.slice('/dashboard/'.length);
+    const type = file.endsWith('.js') ? 'text/javascript; charset=utf-8' :
+      file.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8';
+    try {
+      const content = readFileSync(new URL(`../dashboard/${file}`, import.meta.url));
+      res.writeHead(200, { ...common, 'Content-Type': type }); res.end(content);
+    } catch { res.writeHead(404, common); res.end('Not found'); }
     return;
   }
   void handler(req, res).catch(() => {
