@@ -7,7 +7,7 @@
 
 An independent, publicly developed Model Context Protocol (MCP) project for secure **Microsoft 365, CSP customer and licensing administration** through ChatGPT and compatible clients.
 
-> **Current status (v0.1.0):** local read-only HTTP prototype only. **Not** a Microsoft-connected implementation or public MCP SaaS endpoint. The website is static documentation—not an MCP server.
+> **Current status (v0.2.0 preview):** local prototype plus protected remote resource-server code; not a deployed MCP service. **Not** a Microsoft-connected implementation or public MCP SaaS endpoint. The website is static documentation—not an MCP server.
 
 ## Download
 
@@ -49,6 +49,10 @@ The prototype binds to `http://127.0.0.1:3000/mcp`, validates a JWT bearer token
 | `applications_list` | `connector_unavailable` |
 
 No live Graph, Partner Center, Microsoft 365 or distributor API calls are implemented. All tools are read-only.
+
+## Entra authentication and remote deployment
+
+See the [Entra identity and OAuth setup guide](docs/AUTHENTICATION.md) and [remote deployment runbook](docs/DEPLOYMENT.md). Remote mode serves OAuth protected-resource metadata and validates token signature, issuer, audience, expiration, delegated scope and explicit customer-tenant grants. The Microsoft Entra application registration, compatible OAuth client configuration and live HTTPS host have **not** been provisioned. Do not paste credentials in public issues or GitHub source.
 
 ## Connecting to ChatGPT (future remote deployment)
 
