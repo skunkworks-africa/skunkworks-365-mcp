@@ -2,8 +2,12 @@ targetScope = 'resourceGroup'
 
 param location string = resourceGroup().location
 param appName string = 'skunkworks-365-mcp'
-@description('An approved public container image pinned to sha256 digest. No credentials may be baked into it.')
+@description('An approved container image pinned to sha256 digest. No credentials may be baked into it.')
 param containerImage string
+param registryServer string = ''
+param registryUsername string = ''
+@secure()
+param registryPassword string = ''
 param homeTenantId string
 param apiClientId string
 param graphClientId string
@@ -55,7 +59,8 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
     configuration: {
       activeRevisionsMode: 'Single'
       ingress: { external: true, targetPort: 3000, transport: 'http', allowInsecure: false }
-      secrets: [{ name: 'access-registry', value: accessRegistryJson }]
+      secrets: concat([{ name: 'access-registry', value: accessRegistryJson }], empty(registryServer) ? [] : [{ name: 'registry-password', value: registryPassword }])
+      registries: empty(registryServer) ? [] : [{ server: registryServer, username: registryUsername, passwordSecretRef: 'registry-password' }]
     }
     template: {
       containers: [{
