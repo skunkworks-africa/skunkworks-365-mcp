@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Principal } from './domain.js';
 
-export interface AuthConfig { issuer: string; audience: string; jwksUrl: string; requiredScope?: string }
+export interface AuthConfig { issuer: string; audience: string; jwksUrl: string; requiredScope?: string; requiredRole?: string; entraTenantId?: string }
 export type VerifyToken = (token: string) => Promise<Principal>;
 
 export function authConfig(env: NodeJS.ProcessEnv): AuthConfig {
@@ -20,7 +20,14 @@ export function authConfig(env: NodeJS.ProcessEnv): AuthConfig {
   if (env.MCP_REQUIRED_SCOPE && !/^[a-zA-Z0-9._:/-]{1,128}$/.test(env.MCP_REQUIRED_SCOPE)) {
     throw new Error('Invalid required OAuth scope');
   }
-  return { issuer, audience, jwksUrl, requiredScope: env.MCP_REQUIRED_SCOPE };
+  const entraTenantId = env.MCP_ENTRA_TENANT_ID;
+  if (entraTenantId && (!guid.test(entraTenantId) ||
+      issuer !== `https://login.microsoftonline.com/${entraTenantId}/v2.0` ||
+      jwksUrl !== `https://login.microsoftonline.com/${entraTenantId}/discovery/v2.0/keys`)) {
+    throw new Error('Entra issuer and signing keys must match the configured home tenant');
+  }
+  return { issuer, audience, jwksUrl, requiredScope: env.MCP_REQUIRED_SCOPE,
+    requiredRole: env.MCP_REQUIRED_ROLE, entraTenantId };
 }
 
 export function jwtVerifier(
@@ -34,6 +41,13 @@ export function jwtVerifier(
       clockTolerance: 5
     });
     if (!payload.sub || !payload.iss) throw new Error('Token identity missing');
+    if (config.entraTenantId && (payload.tid !== config.entraTenantId || payload.ver !== '2.0' ||
+        typeof payload.oid !== 'string' || !/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(payload.oid))) {
+      throw new Error('Entra tenant, version or object identity missing');
+    }
+    if (config.requiredRole && (!Array.isArray(payload.roles) || !payload.roles.includes(config.requiredRole))) {
+      throw new Error('Required reader role missing');
+    }
     if (config.requiredScope) {
       const scp = typeof payload.scp === 'string' ? payload.scp :
         typeof payload.scope === 'string' ? payload.scope : '';
@@ -41,7 +55,8 @@ export function jwtVerifier(
         throw new Error('Required delegated OAuth scope missing');
       }
     }
-    return { issuer: payload.iss, subject: payload.sub };
+    return { issuer: payload.iss, subject: payload.sub,
+      ...(config.entraTenantId ? { objectId: payload.oid as string } : {}) };
   };
 }
 

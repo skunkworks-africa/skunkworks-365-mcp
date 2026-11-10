@@ -1,6 +1,22 @@
 # Skunkworks 365 MCP: identity and OAuth deployment
 
-This public GitHub project is **not** a public administrative API. Every MCP tool is authenticated and access is restricted per principal and customer tenant. The code is an **OAuth protected resource server**: it validates access tokens but does not operate an authorization server, Entra registration, user login page or Graph credentials.
+This public GitHub project is **not** a public administrative API. Every MCP tool is authenticated and access is restricted per principal and customer tenant. The code is an **OAuth protected resource server**: it validates access tokens but does not operate an authorization server or user login page. The optional [Graph connector](GRAPH-RUNTIME.md) uses a separate app identity and explicit consent, never the caller's MCP bearer token.
+
+## Optional admin-reviewed bootstrap script
+
+The repository includes [`scripts/register-entra-api.ps1`](../scripts/register-entra-api.ps1), a dry-run-by-default PowerShell bootstrap for the **initial single-tenant** MCP resource API. It does not register ChatGPT as an OAuth client, generate secrets, grant consent, or configure Graph customer access.
+
+With PowerShell 7.2+ and the Microsoft Graph modules installed on **your own administrator workstation**:
+
+```powershell
+Install-Module Microsoft.Graph.Authentication,Microsoft.Graph.Applications -Scope CurrentUser
+# Read-only plan (no Microsoft sign-in or mutation):
+./scripts/register-entra-api.ps1 -TenantId '<YOUR-ENTRA-TENANT-GUID>'
+# Only after reviewing the plan and granting tenant-admin authorization:
+./scripts/register-entra-api.ps1 -TenantId '<YOUR-ENTRA-TENANT-GUID>' -Execute
+```
+
+The execution step opens an interactive Entra sign-in and requests delegated `Application.ReadWrite.All`, a **high-privilege** Microsoft Graph permission. An eligible Entra administrator must review/consent; never run this with unattended credentials, on an untrusted machine, or from public CI. The script refuses to create an app if its display name already exists and requires an interactive high-impact PowerShell confirmation. Save the returned IDs **privately** for your runtime's secret store. Do not paste access tokens or client secrets into chat or public GitHub issues.
 
 ## Optional admin-reviewed bootstrap script
 
@@ -37,8 +53,8 @@ MCP_ACCESS_REGISTRY=/run/secrets/access-registry.json
 PORT=3000
 ```
 
-5. Store explicit allowed `issuer` + `subject` -> `tenants` mappings in the server-side access registry. An authenticated user is not automatically permitted to see every customer.
-6. Configure HTTPS termination, trusted proxy, audit and rate controls. Run with only test tenant grants. Keep provider connectors unavailable until actual Microsoft Graph/GDAP and distributor consent is provisioned.
+5. Store explicit allowed `issuer` + `objectId` -> `tenants` mappings for Entra users (or issuer + subject for generic JWT providers). An authenticated user is not automatically permitted to see every customer. Graph mode also requires `MCP_ENTRA_TENANT_ID`, `MCP_REQUIRED_ROLE=M365.Read`, and the assigned API reader role; see [Graph configuration](GRAPH-RUNTIME.md).
+6. Configure HTTPS termination, trusted proxy, audit and rate controls. Run with only approved tenant grants. Enable Graph only after configuring the separate application identity and consent. GDAP and distributor connectors remain unavailable.
 7. Test `GET /.well-known/oauth-protected-resource`, unauthenticated `POST /mcp` (401 with WWW-Authenticate), valid and expired tokens, wrong audience, missing delegated scope and denial of a different customer tenant.
 
 ## ChatGPT OAuth compatibility
