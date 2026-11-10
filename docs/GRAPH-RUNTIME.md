@@ -45,7 +45,7 @@ Microsoft reference: [Configure an app to trust a managed identity](https://lear
 The manually triggered `Deploy approved runtime` workflow uses GitHub OIDC and a digest-pinned public image. Before running it:
 
 1. Create a dedicated approved resource group. Configure an Entra deployment identity with GitHub federation for `repo:<owner>/<repository>:environment:production`, and scope its Azure Contributor role to this group.
-2. Configure required reviewers and allowed branches on the GitHub `production` environment. Store `AZURE_DEPLOY_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `MCP_API_CLIENT_ID`, and `GRAPH_CLIENT_ID` as private environment variables; store `MCP_ACCESS_REGISTRY_JSON` as an environment secret. Never commit the private values.
+2. Configure required reviewers and allowed branches on the GitHub `production` environment. Store `AZURE_DEPLOY_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `MCP_API_CLIENT_ID`, `GRAPH_CLIENT_ID`, and `MCP_ACCESS_REGISTRY_JSON` as environment secrets so they are masked in workflow logs. Never commit the private values.
 3. Build, scan and publish the approved image; supply its immutable digest to the workflow. The PR container workflow only builds; it does not publish or deploy.
 4. Deploy, then configure the managed identity trust with the separate administrator bootstrap. A health probe only verifies the process, not Graph connectivity.
 5. Configure the actual MCP client's OAuth callback and its Entra client registration. Verify authorization code + PKCE, consent, token renewal, role and tenant rejection, and live tools through the deployed endpoint. No connector callback is fabricated by these scripts.

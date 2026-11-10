@@ -18,10 +18,10 @@ jobs:
     environment: production
     env:
       IMAGE: ${{ inputs.image }}
-      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
-      HOME_TENANT: ${{ vars.AZURE_TENANT_ID }}
-      API_CLIENT: ${{ vars.MCP_API_CLIENT_ID }}
-      GRAPH_CLIENT: ${{ vars.GRAPH_CLIENT_ID }}
+      RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+      HOME_TENANT: ${{ secrets.AZURE_TENANT_ID }}
+      API_CLIENT: ${{ secrets.MCP_API_CLIENT_ID }}
+      GRAPH_CLIENT: ${{ secrets.GRAPH_CLIENT_ID }}
       ACCESS_REGISTRY: ${{ secrets.MCP_ACCESS_REGISTRY_JSON }}
     steps:
       - uses: actions/checkout@v4
@@ -30,9 +30,9 @@ jobs:
       - run: npm ci --ignore-scripts && npm test
       - uses: azure/login@v2
         with:
-          client-id: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.AZURE_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       - name: Validate and write private deployment parameters
         shell: bash
         run: |
