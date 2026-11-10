@@ -31,9 +31,16 @@ async function refresh() {
   try {
     const data = await get(`/dashboard/api/tenant/${encodeURIComponent(id)}/summary`);
     rows($('services'), data.health?.status === 'ok' ? data.health.items : [], x => x.service || x.id || 'Service', x => x.status || 'Unknown');
-    rows($('licences'), data.licences?.status === 'ok' ? data.licences.items : [], x => x.skuPartNumber || 'SKU', x => `${x.consumedUnits ?? '—'} assigned · ${x.prepaidUnits?.enabled ?? '—'} enabled`);
+    const licences = data.licences?.status === 'ok' ? data.licences.items : [];
+    rows($('licences'), licences, x => x.skuPartNumber || 'SKU', x => {
+      const suspended = Number(x.prepaidUnits?.suspended ?? 0);
+      return `${x.consumedUnits ?? '—'} assigned · ${x.prepaidUnits?.enabled ?? '—'} enabled${suspended ? ` · ${suspended} suspended` : ''}${x.capabilityStatus && x.capabilityStatus !== 'Enabled' ? ` · ${x.capabilityStatus}` : ''}`;
+    });
     $('updated').textContent = `Last refreshed ${new Date().toLocaleString()}`;
-    notice(data.health?.status === 'ok' || data.licences?.status === 'ok' ? 'Live read complete.' : 'Microsoft 365 data is not available for this tenant.', !(data.health?.status === 'ok' || data.licences?.status === 'ok'));
+    const suspendedSkus = licences.filter(x => Number(x.prepaidUnits?.suspended ?? 0) > 0 || x.capabilityStatus === 'Suspended').length;
+    notice(suspendedSkus ? `Live read complete. ${suspendedSkus} licence SKU${suspendedSkus === 1 ? ' is' : 's are'} suspended.` :
+      data.health?.status === 'ok' || data.licences?.status === 'ok' ? 'Live read complete.' : 'Microsoft 365 data is not available for this tenant.',
+      suspendedSkus > 0 || !(data.health?.status === 'ok' || data.licences?.status === 'ok'));
   } catch (error) { notice(error.message, true); }
   finally { $('refresh').disabled = false; }
 }
