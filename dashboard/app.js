@@ -59,10 +59,11 @@ async function main() {
     const response = await fetch('/dashboard/config.json', { cache: 'no-store' });
     settings = await response.json();
     if (!settings.enabled) { notice('Dashboard sign-in is awaiting an approved Microsoft app registration.'); return; }
-    client = await PublicClientApplication.createPublicClientApplication({
+    client = new PublicClientApplication({
       auth: { clientId: settings.clientId, authority: `https://login.microsoftonline.com/${settings.tenantId}`, redirectUri: settings.redirectUri },
       cache: { cacheLocation: 'memoryStorage' }
     });
+    await client.initialize();
     $('entry').hidden = false; notice('Sign in to see your approved tenants.');
     $('signin').addEventListener('click', signIn);
     $('refresh').addEventListener('click', refresh);
