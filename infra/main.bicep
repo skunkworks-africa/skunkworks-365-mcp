@@ -7,6 +7,8 @@ param containerImage string
 param homeTenantId string
 param apiClientId string
 param graphClientId string
+@description('Public single-tenant SPA client ID for the private read-only dashboard.')
+param dashboardClientId string = ''
 @secure()
 @description('Explicit issuer + objectId/subject to tenant grants; stored as a Container Apps secret.')
 param accessRegistryJson string
@@ -76,6 +78,7 @@ resource app 'Microsoft.App/containerApps@2025-01-01' = {
           { name: 'MCP_REQUIRED_SCOPE', value: 'access_as_user' }
           { name: 'MCP_REQUIRED_ROLE', value: 'M365.Read' }
           { name: 'MCP_OAUTH_SCOPE', value: 'api://${apiClientId}/access_as_user' }
+          { name: 'MCP_DASHBOARD_CLIENT_ID', value: dashboardClientId }
           { name: 'MCP_ACCESS_REGISTRY_JSON', secretRef: 'access-registry' }
           { name: 'GRAPH_ENABLED', value: 'true' }
           { name: 'GRAPH_CLIENT_ID', value: graphClientId }

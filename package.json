@@ -9,12 +9,13 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/build-dashboard.mjs",
     "test": "npm run build && node --test dist/test/*.test.js",
     "start": "node dist/src/main.js"
   },
   "dependencies": {
     "@azure/identity": "4.14.1",
+    "@azure/msal-browser": "5.29.0",
     "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/server": "2.4.0",
     "jose": "6.2.17",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "esbuild": "0.28.2",
     "typescript": "7.0.2"
   }
 }
