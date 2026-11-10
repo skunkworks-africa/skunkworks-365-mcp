@@ -1,6 +1,6 @@
 {
   "name": "skunkworks-365-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Local read-only Microsoft 365/CSP MCP prototype; upstream connectors unavailable",
   "license": "MIT",
