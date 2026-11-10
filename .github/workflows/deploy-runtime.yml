@@ -1,0 +1,56 @@
+name: Deploy approved runtime
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: 'Approved public image pinned to sha256 digest'
+        required: true
+        type: string
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: deploy-skunkworks-365-mcp
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      IMAGE: ${{ inputs.image }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      HOME_TENANT: ${{ vars.AZURE_TENANT_ID }}
+      API_CLIENT: ${{ vars.MCP_API_CLIENT_ID }}
+      GRAPH_CLIENT: ${{ vars.GRAPH_CLIENT_ID }}
+      ACCESS_REGISTRY: ${{ secrets.MCP_ACCESS_REGISTRY_JSON }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '24' }
+      - run: npm ci --ignore-scripts && npm test
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Validate and write private deployment parameters
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          import { grantsSchema } from './dist/src/domain.js';
+          const e = process.env;
+          if (!/^[a-zA-Z0-9./_-]+@sha256:[a-f0-9]{64}$/.test(e.IMAGE ?? '')) throw new Error('Use a digest-pinned image');
+          if (!e.RESOURCE_GROUP) throw new Error('Resource group required');
+          for (const key of ['HOME_TENANT','API_CLIENT','GRAPH_CLIENT']) {
+            if (!/^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(e[key] ?? '')) throw new Error('Invalid identity configuration');
+          }
+          grantsSchema.parse(JSON.parse(e.ACCESS_REGISTRY));
+          const values = { containerImage: e.IMAGE, homeTenantId: e.HOME_TENANT, apiClientId: e.API_CLIENT, graphClientId: e.GRAPH_CLIENT, accessRegistryJson: e.ACCESS_REGISTRY };
+          writeFileSync('runtime.parameters.json', JSON.stringify({ parameters: Object.fromEntries(Object.entries(values).map(([k,v]) => [k,{value:v}])) }), { mode: 0o600 });
+          NODE
+      - name: Deploy
+        run: az deployment group create --resource-group "$RESOURCE_GROUP" --name skunkworks-365-mcp --template-file infra/main.bicep --parameters @runtime.parameters.json --only-show-errors --output none
+      - name: Remove private parameters
+        if: always()
+        run: rm -f runtime.parameters.json

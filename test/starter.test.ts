@@ -68,12 +68,12 @@ test('MCP initialization uses SDK', async () => {
   const body = await rpcBody(response);
   assert.equal(body.result.serverInfo.name, 'skunkworks-365-mcp');
 });
-test('eight read-only tools, provider reads require tenant ID', async () => {
+test('ten read-only tools, provider reads require tenant ID', async () => {
   const body = await rpcBody(await rpc('tools/list'));
-  assert.equal(body.result.tools.length, 8);
+  assert.equal(body.result.tools.length, 10);
   for (const tool of body.result.tools) {
     assert.equal(tool.annotations.readOnlyHint, true);
-    if (tool.name !== 'tenants_list_authorized') assert.deepEqual(tool.inputSchema.required, ['tenantId']);
+    if (tool.name !== 'tenants_list_authorized') assert.deepEqual(tool.inputSchema.required, tool.name === 'users_get' ? ['tenantId','userId'] : ['tenantId']);
   }
 });
 test('unauthorized tool arguments denied', async () => {
