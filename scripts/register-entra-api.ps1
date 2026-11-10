@@ -70,6 +70,11 @@ if ($existing.Count -gt 0) {
 }
 
 $permissionId = [guid]::NewGuid().ToString()
+$readerRole = @{
+  Id = [guid]::NewGuid().ToString(); Value = 'M365.Read'; DisplayName = 'Microsoft 365 MCP Reader'
+  Description = 'Read explicitly authorized tenant data through the MCP API.'
+  AllowedMemberTypes = @('User'); IsEnabled = $true
+}
 $api = @{
   RequestedAccessTokenVersion = 2
   Oauth2PermissionScopes = @(
@@ -85,16 +90,17 @@ $api = @{
     }
   )
 }
-$app = New-MgApplication -DisplayName $DisplayName -SignInAudience 'AzureADMyOrg' -Api $api -ErrorAction Stop
+$app = New-MgApplication -DisplayName $DisplayName -SignInAudience 'AzureADMyOrg' -Api $api -AppRoles @($readerRole) -ErrorAction Stop
 try {
   Update-MgApplication -ApplicationId $app.Id -IdentifierUris @("api://$($app.AppId)") -ErrorAction Stop
-  $sp = New-MgServicePrincipal -AppId $app.AppId -ErrorAction Stop
+  $sp = New-MgServicePrincipal -AppId $app.AppId -AppRoleAssignmentRequired -ErrorAction Stop
   Write-Host "Created API application ID: $($app.AppId)" -ForegroundColor Green
   Write-Host "Directory tenant ID: $TenantId"
   Write-Host "Application ID URI: api://$($app.AppId)"
   Write-Host "Delegated scope: api://$($app.AppId)/$Scope"
   Write-Host "Service principal ID: $($sp.Id)"
   Write-Host 'Next: configure a compatible ChatGPT OAuth client; do not enable customer data adapters yet.'
+  Write-Host 'Assign M365.Read only to approved users and configure their explicit server-side tenant grants.'
   Write-Host 'Keep registration values and any future credentials in private deployment settings.'
 } catch {
   Write-Warning "The API application was created but subsequent setup failed. Its AppId is $($app.AppId)."
