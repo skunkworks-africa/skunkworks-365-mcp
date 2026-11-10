@@ -53,9 +53,9 @@ test('JWT verifier enforces audience and delegated OAuth scope', async () => {
     MCP_TOKEN_ISSUER: issuer, MCP_TOKEN_AUDIENCE: aud,
     MCP_JWKS_URL: issuer + '/jwks', MCP_REQUIRED_SCOPE: 'access_as_user'
   }), publicKey);
-  const sign = (claims: Record<string, unknown>) => new SignJWT({ sub: 'subject', scp: 'access_as_user', ...claims })
+  const sign = (claims: Record<string, unknown>) => new SignJWT({ sub: 'subject', scp: 'access_as_user', aud, ...claims })
     .setProtectedHeader({ alg: 'RS256' })
-    .setIssuer(issuer).setAudience(aud).setIssuedAt().setExpirationTime('5m').sign(privateKey);
+    .setIssuer(issuer).setIssuedAt().setExpirationTime('5m').sign(privateKey);
   assert.deepEqual(await verify(await sign({})), { issuer, subject: 'subject' });
   await assert.rejects(verify(await sign({ scp: 'User.Read' })));
   await assert.rejects(verify(await sign({ scp: undefined })));
