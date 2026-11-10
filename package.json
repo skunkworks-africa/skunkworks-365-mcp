@@ -1,8 +1,8 @@
 {
   "name": "skunkworks-365-mcp",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "Local read-only Microsoft 365/CSP MCP prototype; upstream connectors unavailable",
+  "description": "Entra-protected read-only Microsoft Graph MCP server with explicit per-caller tenant grants",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -10,13 +10,14 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "npm run build && node --test dist/test/*.test.js && node --test test/theme-conformance.test.mjs",
+    "test": "npm run build && node --test dist/test/*.test.js",
     "start": "node dist/src/main.js"
   },
   "dependencies": {
+    "@azure/identity": "4.14.1",
     "@modelcontextprotocol/node": "2.1.2",
     "@modelcontextprotocol/server": "2.4.0",
-    "jose": "6.2.15",
+    "jose": "6.2.17",
     "zod": "4.6.7"
   },
   "devDependencies": {

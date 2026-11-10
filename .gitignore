@@ -6,3 +6,8 @@ dist/
 access-registry.json
 *.log
 .DS_Store
+*.pem
+*.pfx
+*.p12
+runtime.parameters.json
+infra/main.json

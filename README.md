@@ -7,7 +7,7 @@
 
 An independent, publicly developed Model Context Protocol (MCP) project for secure **Microsoft 365, CSP customer and licensing administration** through ChatGPT and compatible clients.
 
-> **Current status (v0.1.0):** local read-only HTTP prototype only. **Not** a Microsoft-connected implementation or public MCP SaaS endpoint. The website is static documentation—not an MCP server.
+> **Current status (v0.3.0 preview):** Entra-protected remote resource-server code with an optional read-only Microsoft Graph connector and Azure deployment templates. A source checkout does not provision a hosted service. The website is static documentation, not an MCP server.
 
 ## Download
 
@@ -23,7 +23,7 @@ cd skunkworks-365-mcp
 Requires **Node.js 24+**.
 
 ```bash
-npm install --ignore-scripts
+npm ci --ignore-scripts
 cp .env.example .env
 cp access-registry.example.json access-registry.json
 # Edit the four example settings to match a JWT issuer you control.
@@ -40,15 +40,21 @@ The prototype binds to `http://127.0.0.1:3000/mcp`, validates a JWT bearer token
 | Tool | Behavior |
 | --- | --- |
 | `tenants_list_authorized` | Lists locally configured tenant IDs for the verified principal |
-| `users_list` | `connector_unavailable` |
-| `licenses_capacity` | `connector_unavailable` |
+| `users_list` | Bounded Graph user page when configured; otherwise `connector_unavailable` |
+| `users_get` | Read one user by object UUID |
+| `licenses_capacity` | Graph subscribed SKU capacity; never billing data |
+| `service_health` | Microsoft 365 subscribed-service health |
 | `subscriptions_list` | `connector_unavailable` |
 | `billing_records` | `connector_unavailable` |
 | `gdap_relationships` | `connector_unavailable` |
 | `policies_list` | `connector_unavailable` |
 | `applications_list` | `connector_unavailable` |
 
-No live Graph, Partner Center, Microsoft 365 or distributor API calls are implemented. All tools are read-only.
+Graph remains disabled by default. [Configure the Graph runtime](docs/GRAPH-RUNTIME.md) with a separate consented application, an assigned reader role and explicit per-caller tenant grants. Partner Center, billing, policies, applications and distributor connectors remain unavailable. All tools are read-only.
+
+## Entra authentication and remote deployment
+
+See the [Entra identity and OAuth setup guide](docs/AUTHENTICATION.md), [Graph runtime and deployment configuration](docs/GRAPH-RUNTIME.md) and [remote deployment runbook](docs/DEPLOYMENT.md). Graph mode validates token signature, home tenant, v2 audience, expiration, delegated scope, reader role and explicit customer-tenant grants. Registration and hosting are operator-managed. Never paste private tenant IDs or credentials in public issues or GitHub source.
 
 ## Connecting to ChatGPT (future remote deployment)
 
