@@ -43,7 +43,7 @@ test('unauthenticated MCP calls receive resource metadata challenge', async () =
 test('health probe does not publish customer data', async () => {
   const res = await app(new Request('https://mcp.example.com/healthz'));
   assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { status: 'ok', graphConfigured: false, providerConnectivity: 'not_checked_by_health_probe' });
+  assert.deepEqual(await res.json(), { status: 'ok', liveProviderConnections: false });
 });
 test('JWT verifier enforces audience and delegated OAuth scope', async () => {
   const { publicKey, privateKey } = await generateKeyPair('RS256');

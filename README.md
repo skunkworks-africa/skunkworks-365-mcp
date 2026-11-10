@@ -7,7 +7,7 @@
 
 An independent, publicly developed Model Context Protocol (MCP) project for secure **Microsoft 365, CSP customer and licensing administration** through ChatGPT and compatible clients.
 
-> **Current status (v0.3.0 preview):** Entra-protected remote resource-server code with an optional read-only Microsoft Graph connector and Azure deployment templates. A source checkout does not provision a hosted service. The website is static documentation, not an MCP server.
+> **Current status (v0.2.0 preview):** local prototype plus protected remote resource-server code; not a deployed MCP service. **Not** a Microsoft-connected implementation or public MCP SaaS endpoint. The website is static documentation—not an MCP server.
 
 ## Download
 
@@ -55,6 +55,10 @@ Graph remains disabled by default. [Configure the Graph runtime](docs/GRAPH-RUNT
 ## Entra authentication and remote deployment
 
 See the [Entra identity and OAuth setup guide](docs/AUTHENTICATION.md), [Graph runtime and deployment configuration](docs/GRAPH-RUNTIME.md) and [remote deployment runbook](docs/DEPLOYMENT.md). Graph mode validates token signature, home tenant, v2 audience, expiration, delegated scope, reader role and explicit customer-tenant grants. Registration and hosting are operator-managed. Never paste private tenant IDs or credentials in public issues or GitHub source.
+
+## Entra authentication and remote deployment
+
+See the [Entra identity and OAuth setup guide](docs/AUTHENTICATION.md) and [remote deployment runbook](docs/DEPLOYMENT.md). Remote mode serves OAuth protected-resource metadata and validates token signature, issuer, audience, expiration, delegated scope and explicit customer-tenant grants. The Microsoft Entra application registration, compatible OAuth client configuration and live HTTPS host have **not** been provisioned. Do not paste credentials in public issues or GitHub source.
 
 ## Connecting to ChatGPT (future remote deployment)
 
