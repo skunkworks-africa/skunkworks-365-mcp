@@ -97,6 +97,21 @@ test('cost result handles recognized columns and flags pagination', async () => 
   await assert.rejects(client.getSubscriptionCost(principal, scope, '2026-02-31', '2026-03-01'), code('invalid_date'));
 });
 
+test('cost query accepts 370 inclusive dates and rejects 371 before authorization', async () => {
+  let authorizations = 0;
+  let requests = 0;
+  const client = new ArmClient({
+    authorize: async () => { authorizations++; return true; },
+    getDelegatedToken: async () => 'token',
+    fetch: async () => { requests++; return json({ properties: { columns: [{ name: 'PreTaxCost' }, { name: 'Currency' }], rows: [[1, 'ZAR']] } }); },
+  });
+  const result = await client.getSubscriptionCost(principal, scope, '2024-01-01', '2025-01-04');
+  assert.deepEqual(result.items, [{ amount: 1, currency: 'ZAR' }]);
+  await assert.rejects(client.getSubscriptionCost(principal, scope, '2024-01-01', '2025-01-05'), code('invalid_date'));
+  assert.equal(authorizations, 1);
+  assert.equal(requests, 1);
+});
+
 test('missing currency, oversized and invalid responses fail closed', async () => {
   const mock = response => new ArmClient({ authorize: async () => true, getDelegatedToken: async () => 'token', fetch: async () => response });
   await assert.rejects(mock(json({ properties: { columns: [{ name: 'Cost' }], rows: [[1]] } })).getSubscriptionCost(principal, scope, '2026-01-01', '2026-01-31'), code('invalid_response'));
