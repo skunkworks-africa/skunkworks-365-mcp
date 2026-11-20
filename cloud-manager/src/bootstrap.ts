@@ -62,7 +62,7 @@ export function createConfiguredHandler(env: Environment, fetchers: Fetchers = {
     clientId: appId, clientSecret, verifyBearer,
     ...(fetchers.exchangeFetch ? { fetch: fetchers.exchangeFetch } : {}),
   });
-  const service = createCloudManager({ verifyBearer, exchange, authorize, ...(fetchers.armFetch ? { armFetch: fetchers.armFetch } : {}) });
+  const service = createCloudManager({ verifyBearer, exchange, authorize, listGrantedSubscriptions: authorize.list, ...(fetchers.armFetch ? { armFetch: fetchers.armFetch } : {}) });
   return createHttpHandler({ resourceUrl, authorizationServer: authority, delegatedScope: fullScope, handler: service });
 }
 

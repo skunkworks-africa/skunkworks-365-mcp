@@ -14,6 +14,7 @@ This directory contains an early, **unconnected prototype**, not a deployable se
 - Retrieve instance-view status for a named virtual machine.
 - Read hourly average CPU metrics for a named virtual machine over a bounded UTC time range, when separately authorized.
 - Query subscription costs over a specified date range.
+- List the verified user's explicitly configured subscription grants; this does not query Azure or confirm Azure RBAC.
 
 The service composition connects these components using request-scoped identity and explicit grants. An experimental loopback-only local host is available with explicit configuration; customer enrollment, persistent grants and a production hosting boundary are not supplied. Signature and standard JWT claims are checked using the repository's `jose` dependency, while Entra-specific validation and the token exchange remain experimental and require independent review, secure credential storage and live verification before production use. Do not use mocked callbacks or sample identities to grant real customer access.
 
@@ -59,6 +60,8 @@ Every successful demo response carries `X-Cloud-Manager-Demo: synthetic-data-onl
 ## Controlled staging preparation
 
 See [staging setup](docs/staging-setup.md) for the separate Entra registration, explicit grant configuration and validation steps. The configured local host uses plaintext HTTP and may only be used with isolated test identities and test subscriptions. Never tunnel, proxy or expose it publicly, and do not use production credentials. It does not provision Azure resources or provide an external ChatGPT connection.
+
+Run `node src/preflight.ts` with the intended local configuration to check its format without network access or printing configuration values. Exit code 1 means local configuration is invalid; exit code 2 means the local configuration is valid but remote staging remains blocked. A successful format check does not validate Microsoft sign-in, permissions or deployment readiness.
 
 ## Before public release
 
