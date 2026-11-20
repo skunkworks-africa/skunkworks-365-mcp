@@ -2,12 +2,13 @@
 import { ArmClient } from './arm-client.ts';
 import { createMcpHandler } from './mcp-handler.ts';
 import type { VerifiedBearer } from './obo.ts';
-import type { Principal, Scope, ReadOperation } from './grants.ts';
+import type { Principal, Scope, ReadOperation, GrantDirectory } from './grants.ts';
 
 type Deps = {
   verifyBearer: (token: string) => Promise<VerifiedBearer>;
   exchange: (token: string, tenantId: string) => Promise<{ token: string; principal: VerifiedBearer }>;
   authorize: (principal: Principal, scope: Scope, operation: ReadOperation) => Promise<boolean>;
+  listGrantedSubscriptions?: GrantDirectory;
   armFetch?: typeof fetch;
 };
 
@@ -24,6 +25,7 @@ export function createCloudManager(deps: Deps) {
     throw new Error('Identity and grant configuration are required');
   return createMcpHandler({
     authenticate: async header => deps.verifyBearer(bearer(header)),
+    ...(deps.listGrantedSubscriptions ? { listGrantedSubscriptions: deps.listGrantedSubscriptions } : {}),
     clientForRequest: async (context, header) => {
       const identity = context as VerifiedBearer;
       if (typeof identity.objectId !== 'string' || typeof identity.clientId !== 'string') throw new Error('Invalid identity');

@@ -3,6 +3,8 @@ export type ReadOperation = 'vm.list' | 'vm.instanceView' | 'vm.cpu' | 'cost.que
 export type Principal = { issuer: string; subject: string };
 export type Scope = { tenantId: string; subscriptionId: string };
 export type Grant = Principal & Scope & { operations: readonly ReadOperation[] };
+export type GrantedSubscription = { subscriptionId: string; operations: ReadOperation[] };
+export type GrantDirectory = (principal: Principal, verifiedTenantId: string) => Promise<{ subscriptions: GrantedSubscription[]; incomplete: boolean }>;
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const operations = new Set<ReadOperation>(['vm.list', 'vm.instanceView', 'vm.cpu', 'cost.query']);
@@ -14,6 +16,7 @@ const operations = new Set<ReadOperation>(['vm.list', 'vm.instanceView', 'vm.cpu
 export function createGrantPolicy(grants: readonly Grant[]) {
   if (!Array.isArray(grants)) throw new Error('Invalid grant configuration');
   const records = new Map<string, Set<ReadOperation>>();
+  const directory: Grant[] = [];
   const key = (p: Principal, s: Scope) => JSON.stringify([p.issuer, p.subject, s.tenantId.toLowerCase(), s.subscriptionId.toLowerCase()]);
   for (const grant of grants) {
     if (!grant || typeof grant.issuer !== 'string' || !grant.issuer.trim() || grant.issuer.length > 500 ||
@@ -25,12 +28,23 @@ export function createGrantPolicy(grants: readonly Grant[]) {
     const id = key(grant, grant);
     if (records.has(id) || new Set(grant.operations).size !== grant.operations.length) throw new Error('Duplicate grant configuration');
     records.set(id, new Set(grant.operations));
+    directory.push({ issuer: grant.issuer, subject: grant.subject, tenantId: grant.tenantId.toLowerCase(), subscriptionId: grant.subscriptionId.toLowerCase(), operations: [...grant.operations] });
   }
-  return async (principal: Principal, scope: Scope, operation: ReadOperation): Promise<boolean> => {
+  const authorize = async (principal: Principal, scope: Scope, operation: ReadOperation): Promise<boolean> => {
     if (!principal || typeof principal.issuer !== 'string' || typeof principal.subject !== 'string' ||
         !scope || typeof scope.tenantId !== 'string' || !uuid.test(scope.tenantId) ||
         typeof scope.subscriptionId !== 'string' || !uuid.test(scope.subscriptionId) || !operations.has(operation)) return false;
     return records.get(key(principal, scope))?.has(operation) === true;
   };
+  const list: GrantDirectory = async (principal, verifiedTenantId) => {
+    if (!principal || typeof principal.issuer !== 'string' || !principal.issuer.trim() ||
+        typeof principal.subject !== 'string' || !principal.subject.trim() ||
+        typeof verifiedTenantId !== 'string' || !uuid.test(verifiedTenantId)) return { subscriptions: [], incomplete: false };
+    const tenant = verifiedTenantId.toLowerCase();
+    const matching = directory.filter(grant => grant.issuer === principal.issuer && grant.subject === principal.subject && grant.tenantId === tenant)
+      .sort((a, b) => a.subscriptionId.localeCompare(b.subscriptionId));
+    return { subscriptions: matching.slice(0, 100).map(grant => ({ subscriptionId: grant.subscriptionId, operations: [...grant.operations] })), incomplete: matching.length > 100 };
+  };
+  return Object.assign(authorize, { list });
 }
 

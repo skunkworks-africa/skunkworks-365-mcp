@@ -53,6 +53,8 @@ The following are configuration **names**, not values. Populate them only throug
 
 Each grant has `issuer`, `subject`, `tenantId`, `subscriptionId`, and `operations`. The issuer is the **verified** token issuer `https://login.microsoftonline.com/<issuing-tenant-guid>/v2.0`, and `subject` must match the verified token's `sub` for this API; don't substitute a name, email, or object ID. Operations are explicitly selected from `vm.list`, `vm.instanceView`, `vm.cpu`, and `cost.query`. Capture the verified identity through a controlled secure operator process, not by copying bearer tokens into chat. Configure only intended users and scopes, and don't set wildcard grants.
 
+Run `node src/preflight.ts` to inspect local configuration without network calls or displaying values. Exit code 1 indicates invalid local configuration; exit code 2 indicates valid local configuration while remote staging remains blocked. This checks configuration format, not live authorization or deployment readiness.
+
 With dependencies installed using the repository lockfile and secure config supplied, launch from `cloud-manager/`:
 
 ```text

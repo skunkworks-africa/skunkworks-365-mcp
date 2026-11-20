@@ -117,3 +117,36 @@ test('sanitizes provider exceptions and does not expose incoming token', async (
   });
 });
 
+test('caps concurrent tenant discovery, shares same-tenant work and releases capacity after failure', async () => {
+  const tenants = Array.from({ length: 5 }, (_, i) => `aaaaaaaa-aaaa-4aaa-8aaa-${String(i + 1).padStart(12, '0')}`);
+  const issued = tenant => token({ tid: tenant, iss: `https://login.microsoftonline.com/${tenant}/v2.0` });
+  const calls = [];
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const auth = new EntraAuthenticator({
+    audience: API, tenantIds: tenants, requiredScope: 'cloud.read', allowedClientIds: [CLIENT],
+    now: () => 1700000000000,
+    fetch: async url => {
+      const tenant = new URL(url).pathname.split('/')[1];
+      calls.push({ tenant, url });
+      if (url.endsWith('/.well-known/openid-configuration')) {
+        await gate;
+        if (tenant === tenants[0]) throw new Error('private provider details');
+        return Response.json({ issuer: `https://login.microsoftonline.com/${tenant}/v2.0`, jwks_uri: `https://login.microsoftonline.com/${tenant}/discovery/v2.0/keys` });
+      }
+      return Response.json({ keys: [jwk(key1)] });
+    },
+  });
+  const pending = tenants.slice(0, 4).map(t => auth.authenticate(issued(t)));
+  const duplicate = auth.authenticate(issued(tenants[0]));
+  await assert.rejects(auth.authenticate(issued(tenants[4])), { message: 'Authentication failed.' });
+  assert.equal(calls.length, 4, 'duplicate and over-budget tenants do not start new requests');
+  release();
+  const results = await Promise.allSettled([...pending, duplicate]);
+  assert.equal(results[0].status, 'rejected');
+  assert.equal(results[4].status, 'rejected');
+  assert.ok(results.slice(1, 4).every(result => result.status === 'fulfilled'));
+  assert.equal(await auth.authenticate(issued(tenants[4])).then(p => p.tenantId), tenants[4]);
+  assert.equal(calls.filter(call => call.tenant === tenants[0]).length, 1);
+});
+

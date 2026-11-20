@@ -107,6 +107,10 @@ test('signed user reaches only their granted Azure scope through the configured 
     assert.equal(calls.exchange[0].assertion, token);
     assert.equal(calls.arm[0].bearer, 'Bearer fake-arm-token');
     assert.ok(calls.arm[0].url.includes(`/subscriptions/${subscription}/`));
+    const grantQuery = { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': {} }, name: 'list_authorized_subscriptions', arguments: {} } };
+    const grantedResponse = await fetch(local, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2026-07-28', 'mcp-method': 'tools/call', 'mcp-name': 'list_authorized_subscriptions' }, body: JSON.stringify(grantQuery) });
+    const granted = JSON.parse((await grantedResponse.json()).result.content[0].text);
+    assert.deepEqual(granted, { subscriptions: [{ subscriptionId: subscription, operations: ['vm.list'] }], incomplete: false });
     const deniedTenant = await (await request(otherTenant, subscription)).json();
     const deniedSubscription = await (await request(tenant, otherSubscription)).json();
     assert.equal(deniedTenant.result.isError, true);

@@ -24,6 +24,9 @@ const MAX_DOCUMENT = 512 * 1024;
 const TTL = 60 * 60 * 1000;
 const RETRY_DELAY = 5 * 60 * 1000;
 const REQUEST_TIMEOUT = 5000;
+// Unverified token claims select a configured tenant before signature checking.
+// Bound concurrent outbound discovery requests per authenticator instance.
+const MAX_CONCURRENT_REFRESHES = 4;
 
 export class AuthenticationError extends Error {
   constructor() { super('Authentication failed.'); this.name = 'AuthenticationError'; }
@@ -70,6 +73,7 @@ export class EntraAuthenticator {
   private readonly fetcher: typeof fetch;
   private readonly now: () => number;
   private readonly cache = new Map<string, Cache>();
+  private activeRefreshes = 0;
   constructor(options: Options) {
     if (!options || !GUID.test(options.audience) || !options.requiredScope || /\s/.test(options.requiredScope)
       || !Array.isArray(options.tenantIds) || options.tenantIds.length < 1 || options.tenantIds.length > 1000
@@ -98,6 +102,9 @@ export class EntraAuthenticator {
     const now = this.now();
     if (entry.pending) return entry.pending;
     if (entry.attemptedAt && now - entry.attemptedAt < RETRY_DELAY) return;
+    // Do not consume this tenant's retry window when the instance budget is full.
+    if (this.activeRefreshes >= MAX_CONCURRENT_REFRESHES) return reject();
+    this.activeRefreshes++;
     entry.attemptedAt = now;
     entry.pending = (async () => {
       const issuer = `${ORIGIN}/${tenant}/v2.0`;
@@ -111,7 +118,7 @@ export class EntraAuthenticator {
         && typeof k.n === 'string' && typeof k.e === 'string' && typeof k.issuer === 'string');
       entry.expiresAt = this.now() + TTL;
     })();
-    try { await entry.pending; } finally { delete entry.pending; }
+    try { await entry.pending; } finally { delete entry.pending; this.activeRefreshes--; }
   }
 
   async authenticate(token: string): Promise<Principal> {

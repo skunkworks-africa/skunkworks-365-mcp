@@ -11,6 +11,7 @@ type AuthContext = Principal & { tenantId: string };
 type HandlerDeps = {
   authenticate: (authorization: string) => Promise<AuthContext | null>;
   clientForRequest: (context: AuthContext, authorization: string) => Promise<Pick<ArmClient, 'listVirtualMachines' | 'getVirtualMachineStatus' | 'getVirtualMachineCpuMetrics' | 'getSubscriptionCost'>>;
+  listGrantedSubscriptions?: (principal: Principal, verifiedTenantId: string) => Promise<{ subscriptions: { subscriptionId: string; operations: string[] }[]; incomplete: boolean }>;
 };
 type JsonObject = Record<string, unknown>;
 type Response = { status: 200 | 202 | 401; body: JsonObject | null };
@@ -42,6 +43,13 @@ const tools = [
     annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
   },
 ];
+
+const grantTool = {
+  name: 'list_authorized_subscriptions',
+  description: 'List subscription IDs and read operations explicitly granted to the signed-in user in their verified tenant. This does not query Azure or imply current Azure RBAC access.',
+  inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+};
 
 const protocolVersion = '2026-07-28';
 const isObject = (value: unknown): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -95,10 +103,20 @@ export function createMcpHandler(deps: HandlerDeps) {
     if (!isObject(message.params) || !isObject(message.params._meta) || message.params._meta['io.modelcontextprotocol/protocolVersion'] !== protocolVersion || !isObject(message.params._meta['io.modelcontextprotocol/clientCapabilities']))
       return errorResponse(id, -32022, 'Unsupported or missing protocol version');
     if (message.method === 'ping') return success(id, {});
-    if (message.method === 'tools/list') return success(id, { tools: structuredClone(tools) });
+    if (message.method === 'tools/list') return success(id, { tools: structuredClone(deps.listGrantedSubscriptions ? [...tools, grantTool] : tools) });
     if (message.method !== 'tools/call') return errorResponse(id, -32601, 'Method not found');
     if (!isObject(message.params) || typeof message.params.name !== 'string') return errorResponse(id, -32602, 'Invalid params');
     const name = message.params.name;
+    if (name === grantTool.name && deps.listGrantedSubscriptions) {
+      const args = message.params.arguments === undefined ? {} : message.params.arguments;
+      if (!isObject(args) || Object.keys(args).length !== 0) return errorResponse(id, -32602, 'Invalid tool arguments');
+      try {
+        const value = await deps.listGrantedSubscriptions(principal, context.tenantId);
+        return success(id, { content: [{ type: 'text', text: JSON.stringify(value) }] });
+      } catch {
+        return success(id, { isError: true, content: [{ type: 'text', text: 'Unable to list authorized subscriptions.' }] });
+      }
+    }
     if (!tools.some(tool => tool.name === name)) return errorResponse(id, -32602, 'Unknown tool');
     const args = message.params.arguments;
     if (!validArguments(name, args)) return errorResponse(id, -32602, 'Invalid tool arguments');
