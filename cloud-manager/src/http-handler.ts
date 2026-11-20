@@ -6,7 +6,7 @@
  */
 type RpcResponse = { status: 200 | 202 | 401; body: Record<string, unknown> | null };
 type RpcHandler = (message: unknown, authorization: string | null) => Promise<RpcResponse>;
-type HttpConfig = { resourceUrl: string; authorizationServer: string; handler: RpcHandler };
+type HttpConfig = { resourceUrl: string; authorizationServer: string; delegatedScope: string; handler: RpcHandler };
 const MAX_BODY_BYTES = 64 * 1024;
 const version = '2026-07-28';
 
@@ -20,8 +20,17 @@ function validateConfig(config: HttpConfig) {
   const authorityPath = /^\/(?:organizations|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/v2\.0$/i;
   if (authority.protocol !== 'https:' || authority.hostname !== 'login.microsoftonline.com' || authority.port || authority.username || authority.password || authority.search || authority.hash || !authorityPath.test(authority.pathname))
     throw new Error('A trusted Microsoft Entra authorization server is required.');
+  // The registered Entra App ID URI must be the canonical MCP resource URL.
+  // A single simple scope name follows it; reject encoding or header syntax
+  // so the same configured scope is safe in discovery and the challenge.
+  const prefix = `${resource.href}/`;
+  if (typeof config.delegatedScope !== 'string' || !config.delegatedScope.startsWith(prefix))
+    throw new Error('A delegated scope for the MCP resource is required.');
+  const scopeName = config.delegatedScope.slice(prefix.length);
+  if (!/^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/.test(scopeName) || scopeName === '.' || scopeName === '..')
+    throw new Error('Invalid delegated scope.');
   const metadata = new URL(`/.well-known/oauth-protected-resource${resource.pathname}`, resource.origin);
-  return { resource, authority, metadata };
+  return { resource, authority, metadata, delegatedScope: config.delegatedScope };
 }
 
 const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
@@ -73,8 +82,8 @@ async function boundedRead(request: Request): Promise<string | null> {
 
 /** The supplied URL and authority are operator config, never request input. */
 export function createHttpHandler(config: HttpConfig) {
-  const { resource, authority, metadata } = validateConfig(config);
-  const challenge = `Bearer resource_metadata="${metadata.href}"`;
+  const { resource, authority, metadata, delegatedScope } = validateConfig(config);
+  const challenge = `Bearer resource_metadata="${metadata.href}", scope="${delegatedScope}"`;
 
   return async function handleHttp(request: Request): Promise<Response> {
     let requestUrl: URL;
@@ -88,13 +97,13 @@ export function createHttpHandler(config: HttpConfig) {
 
     if (requestUrl.pathname === metadata.pathname) {
       if (request.method !== 'GET') return empty(405, { Allow: 'GET' });
-      return jsonResponse({ resource: resource.href, authorization_servers: [authority.href], bearer_methods_supported: ['header'] });
+      return jsonResponse({ resource: resource.href, authorization_servers: [authority.href], bearer_methods_supported: ['header'], scopes_supported: [delegatedScope] });
     }
     if (requestUrl.pathname !== resource.pathname) return empty(404);
     if (request.method !== 'POST') return empty(405, { Allow: 'POST' });
-    const contentType = request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
+    const contentType = request.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
     if (contentType !== 'application/json') return empty(415);
-    const accept = request.headers.get('accept')?.toLowerCase().split(',').map(x => x.split(';', 1)[0].trim()) ?? [];
+    const accept = request.headers.get('accept')?.toLowerCase().split(',').map(x => x.split(';', 1)[0]?.trim()) ?? [];
     if (!accept.includes('application/json') || !accept.includes('text/event-stream')) return empty(406);
     const requestBody = await boundedRead(request);
     if (requestBody === null) return empty(413);

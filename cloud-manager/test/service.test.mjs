@@ -102,7 +102,7 @@ test('concurrent requests keep each user assertion, grant and delegated token is
 test('HTTP transport carries a signed bearer through the composed Azure operation', async () => {
   const { service, network } = setup();
   const endpoint = 'https://cloud.example/mcp';
-  const http = createHttpHandler({ resourceUrl: endpoint, authorizationServer: 'https://login.microsoftonline.com/organizations/v2.0', handler: service });
+  const http = createHttpHandler({ resourceUrl: endpoint, authorizationServer: 'https://login.microsoftonline.com/organizations/v2.0', delegatedScope: `${endpoint}/cloud.read`, handler: service });
   const request = new Request(endpoint, {
     method: 'POST',
     headers: {

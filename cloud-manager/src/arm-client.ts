@@ -6,7 +6,7 @@
 
 type Scope = { tenantId: string; subscriptionId: string };
 type Principal = { issuer: string; subject: string };
-type Operation = 'vm.list' | 'vm.instanceView' | 'cost.query';
+type Operation = 'vm.list' | 'vm.instanceView' | 'vm.cpu' | 'cost.query';
 type Dependencies = {
   authorize: (principal: Principal, scope: Scope, operation: Operation) => Promise<boolean>;
   getDelegatedToken: (principal: Principal, scope: Scope) => Promise<string>;
@@ -41,6 +41,16 @@ function timestamp(value: string): number {
   const ms = Date.parse(value + 'T00:00:00.000Z');
   if (!Number.isFinite(ms) || new Date(ms).toISOString().slice(0, 10) !== value)
     throw new ArmError('invalid_date', 'Invalid calendar date.');
+  return ms;
+}
+
+function instant(value: string): number {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value))
+    throw new ArmError('invalid_date', 'Times must be UTC timestamps.');
+  const ms = Date.parse(value);
+  const expected = value.length === 20 ? value.slice(0, -1) + '.000Z' : value;
+  if (!Number.isFinite(ms) || new Date(ms).toISOString() !== expected)
+    throw new ArmError('invalid_date', 'Invalid UTC timestamp.');
   return ms;
 }
 
@@ -132,6 +142,35 @@ export class ArmClient {
       code: typeof s.code === 'string' ? s.code.slice(0, 128) : null,
       displayStatus: typeof s.displayStatus === 'string' ? s.displayStatus.slice(0, 256) : null,
     })) };
+  }
+
+  async getVirtualMachineCpuMetrics(principal: Principal, requestedScope: Scope, resourceGroup: string, vmName: string, from: string, to: string) {
+    const scope = validScope(requestedScope);
+    const first = instant(from), last = instant(to);
+    if (last <= first || last - first > 7 * 86_400_000)
+      throw new ArmError('invalid_date', 'The UTC time range must be ordered and at most seven days.');
+    const query = new URLSearchParams({ timespan: `${from}/${to}`, interval: 'PT1H', metricnames: 'Percentage CPU', metricnamespace: 'Microsoft.Compute/virtualMachines', aggregation: 'Average', 'api-version': '2023-10-01' });
+    const path = `/subscriptions/${scope.subscriptionId}/resourceGroups/${pathPart(resourceGroup)}/providers/Microsoft.Compute/virtualMachines/${pathPart(vmName)}/providers/Microsoft.Insights/metrics?${query}`;
+    const result = await this.request(principal, scope, 'vm.cpu', path);
+    if (!Array.isArray(result?.value)) throw new ArmError('invalid_response', 'Azure returned an unexpected metric response.');
+    const matches = result.value.filter((m: any) => m?.name?.value === 'Percentage CPU');
+    if (matches.length > 1) throw new ArmError('invalid_response', 'Azure returned ambiguous CPU metrics.');
+    const metric = matches[0];
+    if (!metric) return { from, to, interval: typeof result.interval === 'string' ? result.interval : null, unit: null, series: [], noData: true, incomplete: typeof result.nextLink === 'string' };
+    if ((metric.errorCode && metric.errorCode !== 'Success') || !Array.isArray(metric.timeseries))
+      throw new ArmError('invalid_response', 'Azure did not return CPU metrics successfully.');
+    let incomplete = metric.timeseries.length > 10 || typeof result.nextLink === 'string';
+    const series = metric.timeseries.slice(0, 10).map((s: any) => {
+      if (!Array.isArray(s?.data)) throw new ArmError('invalid_response', 'Azure returned an invalid metric series.');
+      if (s.data.length > 168) incomplete = true;
+      return s.data.slice(0, 168).map((point: any) => {
+        if (typeof point?.timeStamp !== 'string' || !Number.isFinite(Date.parse(point.timeStamp)) ||
+            (point.average !== undefined && point.average !== null && (typeof point.average !== 'number' || !Number.isFinite(point.average))))
+          throw new ArmError('invalid_response', 'Azure returned an invalid metric point.');
+        return { time: new Date(point.timeStamp).toISOString(), average: point.average ?? null };
+      });
+    });
+    return { from, to, interval: typeof result.interval === 'string' ? result.interval : null, unit: typeof metric.unit === 'string' ? metric.unit : null, series, noData: !series.some((s: any[]) => s.some(p => p.average !== null)), incomplete };
   }
 
   async getSubscriptionCost(principal: Principal, requestedScope: Scope, from: string, to: string) {

@@ -13,7 +13,7 @@ type Deps = {
 
 const bearer = (header: string) => {
   const match = /^Bearer ([^\s]+)$/i.exec(header);
-  if (!match) throw new Error('Unauthenticated');
+  if (!match || !match[1]) throw new Error('Unauthenticated');
   return match[1];
 };
 const same = (a: VerifiedBearer, b: VerifiedBearer) => a.issuer === b.issuer && a.subject === b.subject &&

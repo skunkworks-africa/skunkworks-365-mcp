@@ -3,7 +3,7 @@
  * This validates identity, not tenant onboarding, subscription grants or OBO.
  * Production integration and external security review remain mandatory.
  */
-import { createPublicKey, verify } from 'node:crypto';
+import { importJWK, jwtVerify } from 'jose';
 
 type Principal = { issuer: string; subject: string; tenantId: string; objectId: string; clientId: string };
 type Options = {
@@ -75,7 +75,7 @@ export class EntraAuthenticator {
       || !Array.isArray(options.tenantIds) || options.tenantIds.length < 1 || options.tenantIds.length > 1000
       || !options.tenantIds.every(t => typeof t === 'string' && GUID.test(t))
       || !Array.isArray(options.allowedClientIds) || options.allowedClientIds.length < 1
-      || !options.allowedClientIds.every(c => typeof c === 'string' && GUID.test(c))) return reject();
+      || !options.allowedClientIds.every(c => typeof c === 'string' && GUID.test(c))) throw new AuthenticationError();
     this.audience = options.audience.toLowerCase();
     this.requiredScope = options.requiredScope;
     this.tenants = new Set(options.tenantIds.map(t => t.toLowerCase()));
@@ -119,7 +119,9 @@ export class EntraAuthenticator {
       if (typeof token !== 'string' || token.length > MAX_TOKEN) return reject();
       const parts = token.split('.');
       if (parts.length !== 3) return reject();
-      const header = object(decode(parts[0])), claims = object(decode(parts[1]));
+      const [headerSegment, payloadSegment, signatureSegment] = parts;
+      if (headerSegment === undefined || payloadSegment === undefined || signatureSegment === undefined) return reject();
+      const header = object(decode(headerSegment)), claims = object(decode(payloadSegment));
       if (header.alg !== 'RS256' || typeof header.kid !== 'string' || !header.kid || header.kid.length > 128
         || header.crit !== undefined || header.jku !== undefined || header.jwk !== undefined || header.x5u !== undefined) return reject();
       if (claims.ver !== '2.0' || typeof claims.tid !== 'string' || !GUID.test(claims.tid)) return reject();
@@ -137,11 +139,27 @@ export class EntraAuthenticator {
       if (this.now() >= entry.expiresAt || !entry.keys.some(k => k.kid === header.kid)) await this.refresh(tenant, entry);
       if (this.now() >= entry.expiresAt) return reject();
       const keys = entry.keys.filter(k => k.kid === header.kid && (k.issuer === issuer || k.issuer === `${ORIGIN}/{tenantid}/v2.0`));
-      if (keys.length !== 1) return reject();
-      const publicKey = createPublicKey({ key: { kty: 'RSA', n: keys[0].n, e: keys[0].e }, format: 'jwk' });
-      if (typeof publicKey.asymmetricKeyDetails?.modulusLength !== 'number' || publicKey.asymmetricKeyDetails.modulusLength < 2048) return reject();
-      if (!verify('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), publicKey, decode(parts[2]))) return reject();
-      return { issuer, subject: claims.sub, tenantId: tenant, objectId: claims.oid.toLowerCase(), clientId: claims.azp.toLowerCase() };
+      const [key] = keys;
+      if (keys.length !== 1 || !key) return reject();
+      // Entra publishes a non-standard issuer property on signing keys. It is
+      // checked above before the key reaches jose; jose does not enforce it.
+      // jose enforces algorithm and RSA modulus size and validates standard
+      // JWT claims. Keep unverified header/claims solely for key selection.
+      decode(signatureSegment); // Require canonical base64url for the signature.
+      const publicKey = await importJWK({ kty: 'RSA', n: key.n, e: key.e, alg: 'RS256' }, 'RS256');
+      const { payload } = await jwtVerify(token, publicKey, {
+        algorithms: ['RS256'], issuer, audience: this.audience,
+        requiredClaims: ['iss', 'aud', 'sub', 'exp', 'nbf'],
+        currentDate: new Date(this.now()),
+      });
+      // Check Entra-specific fields on the authenticated claims, not just the
+      // untrusted values used to choose the key above.
+      if (payload.ver !== '2.0' || typeof payload.tid !== 'string' || payload.tid.toLowerCase() !== tenant ||
+          typeof payload.oid !== 'string' || !GUID.test(payload.oid) ||
+          typeof payload.azp !== 'string' || !GUID.test(payload.azp) || !this.clients.has(payload.azp.toLowerCase()) ||
+          typeof payload.sub !== 'string' || !payload.sub.trim() || payload.sub.length > 256 ||
+          typeof payload.scp !== 'string' || !payload.scp.split(' ').includes(this.requiredScope)) return reject();
+      return { issuer, subject: payload.sub, tenantId: tenant, objectId: payload.oid.toLowerCase(), clientId: payload.azp.toLowerCase() };
     } catch { return reject(); }
   }
 }

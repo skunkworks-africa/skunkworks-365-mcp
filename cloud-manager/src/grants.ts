@@ -1,11 +1,11 @@
 /** Explicit, in-memory bootstrap grants. Populate only from trusted configuration. */
-export type ReadOperation = 'vm.list' | 'vm.instanceView' | 'cost.query';
+export type ReadOperation = 'vm.list' | 'vm.instanceView' | 'vm.cpu' | 'cost.query';
 export type Principal = { issuer: string; subject: string };
 export type Scope = { tenantId: string; subscriptionId: string };
 export type Grant = Principal & Scope & { operations: readonly ReadOperation[] };
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const operations = new Set<ReadOperation>(['vm.list', 'vm.instanceView', 'cost.query']);
+const operations = new Set<ReadOperation>(['vm.list', 'vm.instanceView', 'vm.cpu', 'cost.query']);
 
 /**
  * This policy is deliberately separate from authentication and token validation.
@@ -21,7 +21,7 @@ export function createGrantPolicy(grants: readonly Grant[]) {
         typeof grant.tenantId !== 'string' || !uuid.test(grant.tenantId) ||
         typeof grant.subscriptionId !== 'string' || !uuid.test(grant.subscriptionId) ||
         !Array.isArray(grant.operations) || grant.operations.length === 0 ||
-        grant.operations.some(op => !operations.has(op))) throw new Error('Invalid grant configuration');
+        grant.operations.some((op: unknown) => typeof op !== 'string' || !operations.has(op as ReadOperation))) throw new Error('Invalid grant configuration');
     const id = key(grant, grant);
     if (records.has(id) || new Set(grant.operations).size !== grant.operations.length) throw new Error('Duplicate grant configuration');
     records.set(id, new Set(grant.operations));
