@@ -137,7 +137,8 @@ export class ArmClient {
   async getSubscriptionCost(principal: Principal, requestedScope: Scope, from: string, to: string) {
     const scope = validScope(requestedScope);
     const first = timestamp(from), last = timestamp(to);
-    if (last < first || last - first > 370 * 86_400_000) throw new ArmError('invalid_date', 'Date range must be ordered and at most 370 days.');
+    // Both endpoints are inclusive, so 370 calendar dates are 369 days apart.
+    if (last < first || last - first >= 370 * 86_400_000) throw new ArmError('invalid_date', 'Date range must be ordered and at most 370 days inclusive.');
     const result = await this.request(principal, scope, 'cost.query', `/subscriptions/${scope.subscriptionId}/providers/Microsoft.CostManagement/query?api-version=2025-03-01`, 'POST', {
       type: 'ActualCost', timeframe: 'Custom', timePeriod: { from: `${from}T00:00:00Z`, to: `${to}T23:59:59Z` },
       dataset: { granularity: 'None', aggregation: { totalCost: { name: 'PreTaxCost', function: 'Sum' } } },
