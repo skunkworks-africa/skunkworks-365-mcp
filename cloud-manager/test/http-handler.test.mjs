@@ -5,6 +5,7 @@ import { createMcpHandler } from '../src/mcp-handler.ts';
 
 const resourceUrl = 'https://cloud.example/mcp';
 const authorizationServer = 'https://login.microsoftonline.com/organizations/v2.0';
+const delegatedScope = `${resourceUrl}/Cloud.Read`;
 const version = '2026-07-28';
 const meta = { 'io.modelcontextprotocol/protocolVersion': version, 'io.modelcontextprotocol/clientCapabilities': {} };
 const context = { issuer: 'https://login.microsoftonline.com/11111111-1111-1111-1111-111111111111/v2.0', subject: 'user-a', tenantId: '11111111-1111-1111-1111-111111111111' };
@@ -12,7 +13,7 @@ const rpc = createMcpHandler({
   authenticate: async auth => auth === 'Bearer good' ? context : null,
   clientForRequest: async () => { throw Error('Not connected'); },
 });
-const make = () => createHttpHandler({ resourceUrl, authorizationServer, handler: rpc });
+const make = () => createHttpHandler({ resourceUrl, authorizationServer, delegatedScope, handler: rpc });
 const discovery = { jsonrpc: '2.0', id: 1, method: 'server/discover', params: { _meta: meta } };
 const post = (body = JSON.stringify(discovery), extra = {}) => {
   let parsed; try { parsed = JSON.parse(body); } catch { parsed = discovery; }
@@ -30,14 +31,17 @@ test('configuration rejects insecure URLs and non-Entra authorities', () => {
     { resourceUrl, authorizationServer: 'https://login.microsoftonline.com/organizations/v2.0?next=bad' },
     { resourceUrl, authorizationServer: 'https://login.microsoftonline.com/common/v2.0' },
   ];
-  for (const config of invalid) assert.throws(() => createHttpHandler({ ...config, handler: rpc }));
+  for (const config of invalid) assert.throws(() => createHttpHandler({ delegatedScope, ...config, handler: rpc }));
+  for (const scope of [undefined, '', 'Cloud.Read', 'https://evil.example/mcp/Cloud.Read', `${resourceUrl}/a/b`, `${resourceUrl}/Cloud.Read extra`, `${resourceUrl}/Cloud.Read\"`, `${resourceUrl}/Cloud.Read\r\nInjected: yes`, `${resourceUrl}/Cloud.Read%22`, `${resourceUrl}/.default`]) {
+    assert.throws(() => createHttpHandler({ resourceUrl, authorizationServer, delegatedScope: scope, handler: rpc }));
+  }
 });
 
 test('protected-resource metadata is built exclusively from trusted configuration', async () => {
   const handler = make();
   const metadata = await handler(new Request('https://cloud.example/.well-known/oauth-protected-resource/mcp', { headers: { Host: 'attacker.example', 'x-forwarded-host': 'attacker.example' } }));
   assert.equal(metadata.status, 200);
-  assert.deepEqual(await metadata.json(), { resource: resourceUrl, authorization_servers: [authorizationServer], bearer_methods_supported: ['header'] });
+  assert.deepEqual(await metadata.json(), { resource: resourceUrl, authorization_servers: [authorizationServer], bearer_methods_supported: ['header'], scopes_supported: [delegatedScope] });
   assert.equal(metadata.headers.get('cache-control'), 'no-store');
   assert.equal((await handler(new Request('https://attacker.example/.well-known/oauth-protected-resource/mcp'))).status, 404);
   assert.equal((await handler(new Request('https://cloud.example/.well-known/oauth-protected-resource/mcp', { method: 'POST' }))).status, 405);
@@ -83,7 +87,7 @@ test('401 challenge uses canonical metadata URL; verified requests reach handler
   const handler = make();
   const unauthorized = await handler(post(undefined, { host: 'evil.example', 'x-forwarded-host': 'evil.example' }));
   assert.equal(unauthorized.status, 401);
-  assert.equal(unauthorized.headers.get('www-authenticate'), 'Bearer resource_metadata="https://cloud.example/.well-known/oauth-protected-resource/mcp"');
+  assert.equal(unauthorized.headers.get('www-authenticate'), `Bearer resource_metadata="https://cloud.example/.well-known/oauth-protected-resource/mcp", scope="${delegatedScope}"`);
   const authorized = await handler(post(undefined, { authorization: 'Bearer good' }));
   assert.equal(authorized.status, 200);
   const result = await authorized.json();
@@ -93,7 +97,7 @@ test('401 challenge uses canonical metadata URL; verified requests reach handler
 });
 
 test('does not leak unexpected handler errors', async () => {
-  const handler = createHttpHandler({ resourceUrl, authorizationServer, handler: async () => { throw Error('secret token'); } });
+  const handler = createHttpHandler({ resourceUrl, authorizationServer, delegatedScope, handler: async () => { throw Error('secret token'); } });
   const response = await handler(post(undefined, { authorization: 'Bearer good' }));
   assert.equal(response.status, 500);
   assert.ok(!(await response.text()).includes('secret'));

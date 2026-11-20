@@ -40,14 +40,14 @@ test('requires host authentication and keeps provider errors private', async () 
   assert.deepEqual(fixture.counts(), { factoryCalls: 0, tokenCalls: 0, networkCalls: 0 });
 });
 
-test('negotiates 2026 discovery and exposes exactly three read-only tools', async () => {
+test('negotiates 2026 discovery and exposes exactly four read-only tools', async () => {
   const { handle } = createFixture();
   const discovery = await handle(req('server/discover'), 'Bearer valid');
   assert.equal(discovery.body.result.resultType, 'complete');
   assert.deepEqual(discovery.body.result.supportedVersions, ['2026-07-28']);
   assert.equal(discovery.body.result.cacheScope, 'private');
   const listed = await handle(req('tools/list'), 'Bearer valid');
-  assert.deepEqual(listed.body.result.tools.map(t => t.name), ['list_virtual_machines', 'get_virtual_machine_status', 'get_subscription_cost']);
+  assert.deepEqual(listed.body.result.tools.map(t => t.name), ['get_virtual_machine_cpu_metrics', 'list_virtual_machines', 'get_virtual_machine_status', 'get_subscription_cost']);
   assert.ok(listed.body.result.tools.every(t => t.annotations.readOnlyHint && t.inputSchema.additionalProperties === false));
   const wrong = await handle(req('tools/list', { _meta: { 'io.modelcontextprotocol/protocolVersion': 'bad' } }), 'Bearer valid');
   assert.equal(wrong.body.error.code, -32022);
@@ -80,11 +80,12 @@ test('rejects a mismatched tenant before creating client and denies mismatched s
   assert.deepEqual(counts(), { factoryCalls: 1, tokenCalls: 0, networkCalls: 0 });
 });
 
-test('routes three operations and suppresses factory and ARM exceptions', async () => {
+test('routes four operations and suppresses factory and ARM exceptions', async () => {
   const seen = [];
   const clientForRequest = async () => ({
     listVirtualMachines: async (...args) => { seen.push(['list', ...args]); return { items: [] }; },
     getVirtualMachineStatus: async (...args) => { seen.push(['status', ...args]); return { statuses: [] }; },
+    getVirtualMachineCpuMetrics: async (...args) => { seen.push(['cpu', ...args]); return { series: [] }; },
     getSubscriptionCost: async (...args) => { seen.push(['cost', ...args]); return { items: [], incomplete: false }; },
   });
   const handle = createMcpHandler({ authenticate: async () => context, clientForRequest });
@@ -92,9 +93,10 @@ test('routes three operations and suppresses factory and ARM exceptions', async 
   for (const response of [
     await handle(call('list_virtual_machines', base), 'Bearer a'),
     await handle(call('get_virtual_machine_status', { ...base, resourceGroup: 'rg', vmName: 'vm' }), 'Bearer a'),
+    await handle(call('get_virtual_machine_cpu_metrics', { ...base, resourceGroup: 'rg', vmName: 'vm', from: '2026-01-01T00:00:00Z', to: '2026-01-02T00:00:00Z' }), 'Bearer a'),
     await handle(call('get_subscription_cost', { ...base, from: '2026-01-01', to: '2026-01-31' }), 'Bearer a'),
   ]) { assert.equal(response.body.result.resultType, 'complete'); assert.equal(response.body.result.content[0].type, 'text'); }
-  assert.deepEqual(seen.map(x => x[0]), ['list', 'status', 'cost']);
+  assert.deepEqual(seen.map(x => x[0]), ['list', 'status', 'cpu', 'cost']);
   assert.ok(seen.every(x => x[1].subject === 'alice' && !('tenantId' in x[1])));
   const throwing = createMcpHandler({ authenticate: async () => context, clientForRequest: async () => { throw Error('secret-token'); } });
   const response = await throwing(call('list_virtual_machines', base), 'Bearer a');
@@ -111,7 +113,7 @@ test('concurrent requests keep credentials bound to their verified contexts', as
       await new Promise(resolve => setTimeout(resolve, ctx.subject === 'alice' ? 10 : 1));
       return {
         listVirtualMachines: async (principal, scope) => { observed.push([principal.subject, scope.tenantId, authorization]); return { items: [] }; },
-        getVirtualMachineStatus: async () => ({}), getSubscriptionCost: async () => ({}),
+        getVirtualMachineStatus: async () => ({}), getVirtualMachineCpuMetrics: async () => ({}), getSubscriptionCost: async () => ({}),
       };
     },
   });

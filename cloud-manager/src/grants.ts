@@ -1,11 +1,11 @@
 /** Explicit, in-memory bootstrap grants. Populate only from trusted configuration. */
-export type ReadOperation = 'vm.list' | 'vm.instanceView' | 'cost.query';
+export type ReadOperation = 'vm.list' | 'vm.instanceView' | 'vm.cpu' | 'cost.query';
 export type Principal = { issuer: string; subject: string };
 export type Scope = { tenantId: string; subscriptionId: string };
 export type Grant = Principal & Scope & { operations: readonly ReadOperation[] };
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const operations = new Set<ReadOperation>(['vm.list', 'vm.instanceView', 'cost.query']);
+const operations = new Set<ReadOperation>(['vm.list', 'vm.instanceView', 'vm.cpu', 'cost.query']);
 
 /**
  * This policy is deliberately separate from authentication and token validation.

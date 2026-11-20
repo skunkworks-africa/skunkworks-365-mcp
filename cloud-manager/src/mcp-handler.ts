@@ -10,7 +10,7 @@ type Principal = { issuer: string; subject: string };
 type AuthContext = Principal & { tenantId: string };
 type HandlerDeps = {
   authenticate: (authorization: string) => Promise<AuthContext | null>;
-  clientForRequest: (context: AuthContext, authorization: string) => Promise<Pick<ArmClient, 'listVirtualMachines' | 'getVirtualMachineStatus' | 'getSubscriptionCost'>>;
+  clientForRequest: (context: AuthContext, authorization: string) => Promise<Pick<ArmClient, 'listVirtualMachines' | 'getVirtualMachineStatus' | 'getVirtualMachineCpuMetrics' | 'getSubscriptionCost'>>;
 };
 type JsonObject = Record<string, unknown>;
 type Response = { status: 200 | 202 | 401; body: JsonObject | null };
@@ -21,6 +21,11 @@ const scopeProperties = {
   subscriptionId: { type: 'string', pattern: uuid, description: 'Azure subscription ID.' },
 };
 const tools = [
+  {
+    name: 'get_virtual_machine_cpu_metrics', description: 'Read hourly average Azure Monitor VM CPU metrics for a UTC time range up to seven days. Missing datapoints are null.',
+    inputSchema: { type: 'object', properties: { ...scopeProperties, resourceGroup: { type: 'string', minLength: 1, maxLength: 90 }, vmName: { type: 'string', minLength: 1, maxLength: 90 }, from: { type: 'string', format: 'date-time' }, to: { type: 'string', format: 'date-time' } }, required: ['tenantId', 'subscriptionId', 'resourceGroup', 'vmName', 'from', 'to'], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+  },
   {
     name: 'list_virtual_machines', description: 'List virtual machines in an authorized Azure subscription. Results can be incomplete.',
     inputSchema: { type: 'object', properties: scopeProperties, required: ['tenantId', 'subscriptionId'], additionalProperties: false },
@@ -46,12 +51,14 @@ const success = (id: unknown, result: JsonObject): Response => ({ status: 200, b
 function validArguments(name: string, args: unknown): args is Record<string, string> {
   if (!isObject(args)) return false;
   const keys = name === 'list_virtual_machines' ? ['tenantId', 'subscriptionId'] : name === 'get_virtual_machine_status'
-    ? ['tenantId', 'subscriptionId', 'resourceGroup', 'vmName'] : ['tenantId', 'subscriptionId', 'from', 'to'];
+    ? ['tenantId', 'subscriptionId', 'resourceGroup', 'vmName'] : name === 'get_virtual_machine_cpu_metrics'
+    ? ['tenantId', 'subscriptionId', 'resourceGroup', 'vmName', 'from', 'to'] : ['tenantId', 'subscriptionId', 'from', 'to'];
   if (Object.keys(args).length !== keys.length || !keys.every(k => Object.hasOwn(args, k) && typeof args[k] === 'string')) return false;
   const values = args as Record<string, string>;
   if (!new RegExp(uuid).test(values.tenantId) || !new RegExp(uuid).test(values.subscriptionId)) return false;
-  if (name === 'get_virtual_machine_status' && ['resourceGroup', 'vmName'].some(k => !values[k].length || values[k].length > 90 || /[\\/\u0000-\u001f]/.test(values[k]) || values[k] === '.' || values[k] === '..')) return false;
+  if ((name === 'get_virtual_machine_status' || name === 'get_virtual_machine_cpu_metrics') && ['resourceGroup', 'vmName'].some(k => !values[k].length || values[k].length > 90 || /[\\/\u0000-\u001f]/.test(values[k]) || values[k] === '.' || values[k] === '..')) return false;
   if (name === 'get_subscription_cost' && ['from', 'to'].some(k => !/^\d{4}-\d{2}-\d{2}$/.test(values[k]))) return false;
+  if (name === 'get_virtual_machine_cpu_metrics' && ['from', 'to'].some(k => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(values[k]))) return false;
   return true;
 }
 
@@ -99,6 +106,7 @@ export function createMcpHandler(deps: HandlerDeps) {
       const client = await deps.clientForRequest(context, authorization);
       const value = name === 'list_virtual_machines' ? await client.listVirtualMachines(principal, scope)
         : name === 'get_virtual_machine_status' ? await client.getVirtualMachineStatus(principal, scope, args.resourceGroup, args.vmName)
+        : name === 'get_virtual_machine_cpu_metrics' ? await client.getVirtualMachineCpuMetrics(principal, scope, args.resourceGroup, args.vmName, args.from, args.to)
         : await client.getSubscriptionCost(principal, scope, args.from, args.to);
       return success(id, { content: [{ type: 'text', text: JSON.stringify(value) }] });
     } catch {
