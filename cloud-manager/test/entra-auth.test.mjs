@@ -64,6 +64,20 @@ test('rejects unsigned, modified, expired and not-yet-valid tokens', async () =>
   }
 });
 
+test('rejects attacker-controlled key headers, missing required claims and undersized RSA keys', async () => {
+  const h = harness();
+  for (const value of [
+    token({}, key1, { jwk: jwk(key2) }),
+    token({}, key1, { x5u: 'https://evil.example/cert' }),
+    token({}, key1, { crit: ['custom'], custom: true }),
+    token({ exp: undefined }), token({ nbf: undefined }),
+  ]) await assert.rejects(h.auth.authenticate(value), { message: 'Authentication failed.' });
+  assert.equal(h.calls.length, 0);
+  const small = generateKeyPairSync('rsa', { modulusLength: 1024 });
+  const weak = harness({ keys: [jwk(small)] });
+  await assert.rejects(weak.auth.authenticate(token({}, small)), { message: 'Authentication failed.' });
+});
+
 test('checks metadata issuer and pins the JWKS URL', async () => {
   for (const metadata of [{ issuer: 'https://evil.example' }, { jwks_uri: 'https://evil.example/keys' }, { jwks_uri: `https://login.microsoftonline.com/${OTHER}/discovery/v2.0/keys` }]) {
     const h = harness({ metadata });

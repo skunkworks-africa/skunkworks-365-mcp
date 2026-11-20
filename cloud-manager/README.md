@@ -15,7 +15,7 @@ This directory contains an early, **unconnected prototype**, not a deployable se
 - Read hourly average CPU metrics for a named virtual machine over a bounded UTC time range, when separately authorized.
 - Query subscription costs over a specified date range.
 
-The service composition connects these components using request-scoped identity and explicit grants. Configuration, the HTTP hosting boundary, and customer enrollment are not supplied. The hand-written identity verification and token exchange are experimental; production must use supported security libraries, independent review, secure credential storage and verified configuration. Do not use mocked callbacks or sample identities to grant real customer access.
+The service composition connects these components using request-scoped identity and explicit grants. An experimental loopback-only local host is available with explicit configuration; customer enrollment, persistent grants and a production hosting boundary are not supplied. Signature and standard JWT claims are checked using the repository's `jose` dependency, while Entra-specific validation and the token exchange remain experimental and require independent review, secure credential storage and live verification before production use. Do not use mocked callbacks or sample identities to grant real customer access.
 
 Azure cost results can be delayed or revised, and access depends on the user's role and billing scope. CPU metrics preserve missing readings and should not be interpreted as a diagnosis on their own. VM, metrics and cost results indicate when a response may be incomplete; the prototype does not follow continuation links. Verify actual permissions and API behavior in a controlled test environment before relying on results.
 
@@ -55,6 +55,10 @@ Invoke-RestMethod -Uri 'http://127.0.0.1:8765/mcp' -Method Post -ContentType 'ap
 ```
 
 Every successful demo response carries `X-Cloud-Manager-Demo: synthetic-data-only`. The local token, tenant and subscription IDs are examples only; do not send actual Azure tokens or credentials to this demonstration. Stop the server with Ctrl+C.
+
+## Controlled staging preparation
+
+See [staging setup](docs/staging-setup.md) for the separate Entra registration, explicit grant configuration and validation steps. The configured local host uses plaintext HTTP and may only be used with isolated test identities and test subscriptions. Never tunnel, proxy or expose it publicly, and do not use production credentials. It does not provision Azure resources or provide an external ChatGPT connection.
 
 ## Before public release
 

@@ -3,7 +3,7 @@
  * This validates identity, not tenant onboarding, subscription grants or OBO.
  * Production integration and external security review remain mandatory.
  */
-import { createPublicKey, verify } from 'node:crypto';
+import { importJWK, jwtVerify } from 'jose';
 
 type Principal = { issuer: string; subject: string; tenantId: string; objectId: string; clientId: string };
 type Options = {
@@ -141,10 +141,25 @@ export class EntraAuthenticator {
       const keys = entry.keys.filter(k => k.kid === header.kid && (k.issuer === issuer || k.issuer === `${ORIGIN}/{tenantid}/v2.0`));
       const [key] = keys;
       if (keys.length !== 1 || !key) return reject();
-      const publicKey = createPublicKey({ key: { kty: 'RSA', n: key.n, e: key.e }, format: 'jwk' });
-      if (typeof publicKey.asymmetricKeyDetails?.modulusLength !== 'number' || publicKey.asymmetricKeyDetails.modulusLength < 2048) return reject();
-      if (!verify('RSA-SHA256', Buffer.from(`${headerSegment}.${payloadSegment}`), publicKey, decode(signatureSegment))) return reject();
-      return { issuer, subject: claims.sub, tenantId: tenant, objectId: claims.oid.toLowerCase(), clientId: claims.azp.toLowerCase() };
+      // Entra publishes a non-standard issuer property on signing keys. It is
+      // checked above before the key reaches jose; jose does not enforce it.
+      // jose enforces algorithm and RSA modulus size and validates standard
+      // JWT claims. Keep unverified header/claims solely for key selection.
+      decode(signatureSegment); // Require canonical base64url for the signature.
+      const publicKey = await importJWK({ kty: 'RSA', n: key.n, e: key.e, alg: 'RS256' }, 'RS256');
+      const { payload } = await jwtVerify(token, publicKey, {
+        algorithms: ['RS256'], issuer, audience: this.audience,
+        requiredClaims: ['iss', 'aud', 'sub', 'exp', 'nbf'],
+        currentDate: new Date(this.now()),
+      });
+      // Check Entra-specific fields on the authenticated claims, not just the
+      // untrusted values used to choose the key above.
+      if (payload.ver !== '2.0' || typeof payload.tid !== 'string' || payload.tid.toLowerCase() !== tenant ||
+          typeof payload.oid !== 'string' || !GUID.test(payload.oid) ||
+          typeof payload.azp !== 'string' || !GUID.test(payload.azp) || !this.clients.has(payload.azp.toLowerCase()) ||
+          typeof payload.sub !== 'string' || !payload.sub.trim() || payload.sub.length > 256 ||
+          typeof payload.scp !== 'string' || !payload.scp.split(' ').includes(this.requiredScope)) return reject();
+      return { issuer, subject: payload.sub, tenantId: tenant, objectId: payload.oid.toLowerCase(), clientId: payload.azp.toLowerCase() };
     } catch { return reject(); }
   }
 }
