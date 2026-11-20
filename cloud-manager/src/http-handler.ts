@@ -101,9 +101,9 @@ export function createHttpHandler(config: HttpConfig) {
     }
     if (requestUrl.pathname !== resource.pathname) return empty(404);
     if (request.method !== 'POST') return empty(405, { Allow: 'POST' });
-    const contentType = request.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
+    const contentType = request.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
     if (contentType !== 'application/json') return empty(415);
-    const accept = request.headers.get('accept')?.toLowerCase().split(',').map(x => x.split(';', 1)[0].trim()) ?? [];
+    const accept = request.headers.get('accept')?.toLowerCase().split(',').map(x => x.split(';', 1)[0]?.trim()) ?? [];
     if (!accept.includes('application/json') || !accept.includes('text/event-stream')) return empty(406);
     const requestBody = await boundedRead(request);
     if (requestBody === null) return empty(413);

@@ -21,7 +21,7 @@ export function createGrantPolicy(grants: readonly Grant[]) {
         typeof grant.tenantId !== 'string' || !uuid.test(grant.tenantId) ||
         typeof grant.subscriptionId !== 'string' || !uuid.test(grant.subscriptionId) ||
         !Array.isArray(grant.operations) || grant.operations.length === 0 ||
-        grant.operations.some(op => !operations.has(op))) throw new Error('Invalid grant configuration');
+        grant.operations.some((op: unknown) => typeof op !== 'string' || !operations.has(op as ReadOperation))) throw new Error('Invalid grant configuration');
     const id = key(grant, grant);
     if (records.has(id) || new Set(grant.operations).size !== grant.operations.length) throw new Error('Duplicate grant configuration');
     records.set(id, new Set(grant.operations));

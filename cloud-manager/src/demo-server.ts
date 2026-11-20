@@ -12,7 +12,7 @@ export const DEMO_SUBSCRIPTION = '22222222-2222-4222-8222-222222222222';
 const client = {
   async listVirtualMachines(_principal: unknown, scope: { tenantId: string; subscriptionId: string }) {
     checkScope(scope);
-    return { demo: true, items: [{ name: 'demo-vm', location: 'example-region' }], incomplete: false };
+    return { demo: true, items: [{ id: '/demo/demo-vm', name: 'demo-vm', location: 'example-region' }], incomplete: false };
   },
   async getVirtualMachineStatus(_principal: unknown, scope: { tenantId: string; subscriptionId: string }, group: string, name: string) {
     checkScope(scope);
@@ -26,7 +26,7 @@ const client = {
   },
   async getSubscriptionCost(_principal: unknown, scope: { tenantId: string; subscriptionId: string }, from: string, to: string) {
     checkScope(scope);
-    return { demo: true, from, to, items: [{ amount: 0, currency: 'USD' }], incomplete: false, note: 'Synthetic demonstration data; not Azure costs.' };
+    return { demo: true, from, to, items: [{ amount: 0, currency: 'USD' }], incomplete: false, retrievedAt: new Date().toISOString(), note: 'Synthetic demonstration data; not Azure costs.' };
   },
 };
 function checkScope(scope: { tenantId: string; subscriptionId: string }) {
@@ -59,7 +59,7 @@ export async function startDemoServer(options: { host?: string; port?: number } 
     if (request.headers.origin && request.headers.origin !== `http://${HOST}:${addr.port}`) return reject(403);
     if (request.url !== '/mcp') return reject(404);
     if (request.method !== 'POST') return reject(405);
-    if (request.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/json') return reject(415);
+    if (request.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') return reject(415);
     const rawLength = request.headers['content-length'];
     if (rawLength && (!/^\d+$/.test(rawLength) || Number(rawLength) > MAX_BODY)) { request.resume(); return reject(413); }
     const chunks: Buffer[] = [];

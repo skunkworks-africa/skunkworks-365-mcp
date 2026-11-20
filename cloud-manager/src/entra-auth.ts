@@ -75,7 +75,7 @@ export class EntraAuthenticator {
       || !Array.isArray(options.tenantIds) || options.tenantIds.length < 1 || options.tenantIds.length > 1000
       || !options.tenantIds.every(t => typeof t === 'string' && GUID.test(t))
       || !Array.isArray(options.allowedClientIds) || options.allowedClientIds.length < 1
-      || !options.allowedClientIds.every(c => typeof c === 'string' && GUID.test(c))) return reject();
+      || !options.allowedClientIds.every(c => typeof c === 'string' && GUID.test(c))) throw new AuthenticationError();
     this.audience = options.audience.toLowerCase();
     this.requiredScope = options.requiredScope;
     this.tenants = new Set(options.tenantIds.map(t => t.toLowerCase()));
@@ -119,7 +119,9 @@ export class EntraAuthenticator {
       if (typeof token !== 'string' || token.length > MAX_TOKEN) return reject();
       const parts = token.split('.');
       if (parts.length !== 3) return reject();
-      const header = object(decode(parts[0])), claims = object(decode(parts[1]));
+      const [headerSegment, payloadSegment, signatureSegment] = parts;
+      if (headerSegment === undefined || payloadSegment === undefined || signatureSegment === undefined) return reject();
+      const header = object(decode(headerSegment)), claims = object(decode(payloadSegment));
       if (header.alg !== 'RS256' || typeof header.kid !== 'string' || !header.kid || header.kid.length > 128
         || header.crit !== undefined || header.jku !== undefined || header.jwk !== undefined || header.x5u !== undefined) return reject();
       if (claims.ver !== '2.0' || typeof claims.tid !== 'string' || !GUID.test(claims.tid)) return reject();
@@ -137,10 +139,11 @@ export class EntraAuthenticator {
       if (this.now() >= entry.expiresAt || !entry.keys.some(k => k.kid === header.kid)) await this.refresh(tenant, entry);
       if (this.now() >= entry.expiresAt) return reject();
       const keys = entry.keys.filter(k => k.kid === header.kid && (k.issuer === issuer || k.issuer === `${ORIGIN}/{tenantid}/v2.0`));
-      if (keys.length !== 1) return reject();
-      const publicKey = createPublicKey({ key: { kty: 'RSA', n: keys[0].n, e: keys[0].e }, format: 'jwk' });
+      const [key] = keys;
+      if (keys.length !== 1 || !key) return reject();
+      const publicKey = createPublicKey({ key: { kty: 'RSA', n: key.n, e: key.e }, format: 'jwk' });
       if (typeof publicKey.asymmetricKeyDetails?.modulusLength !== 'number' || publicKey.asymmetricKeyDetails.modulusLength < 2048) return reject();
-      if (!verify('RSA-SHA256', Buffer.from(`${parts[0]}.${parts[1]}`), publicKey, decode(parts[2]))) return reject();
+      if (!verify('RSA-SHA256', Buffer.from(`${headerSegment}.${payloadSegment}`), publicKey, decode(signatureSegment))) return reject();
       return { issuer, subject: claims.sub, tenantId: tenant, objectId: claims.oid.toLowerCase(), clientId: claims.azp.toLowerCase() };
     } catch { return reject(); }
   }
